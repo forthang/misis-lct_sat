@@ -11,6 +11,8 @@ from api.core.db.review_crud import (
     get_all_available_topics,
     get_topics_statistics,
     get_topics_comparison,
+    get_heatmap_data,
+    get_sentiment_alerts,
 )
 from api.core.schemas import (
     ReviewSchema,
@@ -239,6 +241,52 @@ async def get_comprehensive_dashboard(
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/dashboard/heatmap")
+async def get_heatmap(
+    request: IntervalRequestSchema,
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """
+    Данные для тепловой карты по негативным отзывам
+    """
+    try:
+        heatmap_data = await get_heatmap_data(
+            session=session,
+            start_date=request.start_date,
+            end_date=request.end_date,
+        )
+        return {
+            "status": "success",
+            "data": heatmap_data,
+            "meta": {
+                "start_date": request.start_date.isoformat(),
+                "end_date": request.end_date.isoformat(),
+            },
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/dashboard/alerts")
+async def get_alerts(
+    session: AsyncSession = Depends(get_async_session),
+) -> Dict[str, Any]:
+    """
+    Выявляет и возвращает резкие скачки негативной тональности.
+    """
+    try:
+        alerts = await get_sentiment_alerts(session=session)
+        return {
+            "status": "success",
+            "data": alerts,
+            "meta": {
+                "count": len(alerts)
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post("/topics/statistics", response_model=TopicsStatisticsResponse)

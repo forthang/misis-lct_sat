@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from .routes import reviews
+from .routes import reviews, reports, competitors, ai, export
 from .core import database
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -23,3 +23,7 @@ app.add_middleware(
 
 # app.include_router(shop.router, tags=['shop'])
 app.include_router(reviews.router, tags=['reviews'])
+app.include_router(reports.router)
+app.include_router(competitors.router)
+app.include_router(ai.router)
+app.include_router(export.router)

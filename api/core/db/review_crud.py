@@ -631,3 +631,293 @@ async def get_all_available_topics(
     except Exception as e:
         print(f"Error in get_all_available_topics: {e}")
         raise
+
+
+async def get_heatmap_data(
+    session: AsyncSession,
+    start_date: datetime,
+    end_date: datetime,
+    sentiment: Sentiment = Sentiment.NEGATIVE,
+) -> List[Dict[str, Any]]:
+    """
+    Данные для тепловой карты по категориям и времени.
+    Группирует по месяцам и темам, подсчитывая количество отзывов
+    с определенной тональностью.
+    """
+    trunc_func = func.date_trunc("month", Review.date)
+
+    query = (
+        select(
+            trunc_func.label("period"),
+            Topic.name.label("topic"),
+            func.count(ReviewTopic.review_id).label("count"),
+        )
+        .select_from(ReviewTopic)
+        .join(Review, ReviewTopic.review_id == Review.id)
+        .join(Topic, ReviewTopic.topic_id == Topic.id)
+        .where(
+            Review.date.between(start_date, end_date),
+            ReviewTopic.sentiment == sentiment,
+        )
+        .group_by(trunc_func, Topic.name)
+        .order_by(trunc_func, Topic.name)
+    )
+
+    result = await session.execute(query)
+    rows = result.all()
+
+    # Преобразуем в плоский список для фронтенда
+    # [{ "period": "2024-01", "topic": "Ипотека", "count": 15 }, ...]
+    heatmap_data = []
+    for row in rows:
+        heatmap_data.append(
+            {"period": row.period.strftime("%Y-%m"), "topic": row.topic, "count": row.count}
+        )
+
+    return heatmap_data
+
+
+async def get_sentiment_alerts(
+    session: AsyncSession,
+    min_threshold: int = 5,
+    percentage_threshold: float = 50.0
+) -> List[Dict[str, Any]]:
+    """
+    Выявляет резкие скачки негативной тональности.
+    """
+    today = datetime.now(timezone.utc)
+    last_7_days_start = today - timedelta(days=7)
+    previous_7_days_start = today - timedelta(days=14)
+
+    # Негативные отзывы за последние 7 дней
+    q_recent = (
+        select(Topic.name, func.count(ReviewTopic.review_id).label("count"))
+        .select_from(ReviewTopic)
+        .join(Review).join(Topic)
+        .where(
+            Review.date.between(last_7_days_start, today),
+            ReviewTopic.sentiment == Sentiment.NEGATIVE
+        )
+        .group_by(Topic.name)
+    )
+    
+    recent_counts = {name: count for name, count in await session.execute(q_recent)}
+
+    # Негативные отзывы за предыдущие 7 дней
+    q_previous = (
+        select(Topic.name, func.count(ReviewTopic.review_id).label("count"))
+        .select_from(ReviewTopic)
+        .join(Review).join(Topic)
+        .where(
+            Review.date.between(previous_7_days_start, last_7_days_start),
+            ReviewTopic.sentiment == Sentiment.NEGATIVE
+        )
+        .group_by(Topic.name)
+    )
+    previous_counts = {name: count for name, count in await session.execute(q_previous)}
+
+    alerts = []
+    all_topics = set(recent_counts.keys()) | set(previous_counts.keys())
+
+    for topic in all_topics:
+        recent_count = recent_counts.get(topic, 0)
+        previous_count = previous_counts.get(topic, 0)
+
+        if recent_count < min_threshold:
+            continue
+
+        if previous_count == 0:
+            percentage_increase = float('inf') # Рост с нуля
+        else:
+            percentage_increase = ((recent_count - previous_count) / previous_count) * 100
+
+        if percentage_increase > percentage_threshold:
+            alerts.append({
+                "topic": topic,
+                "recent_negative_count": recent_count,
+                "previous_negative_count": previous_count,
+                "percentage_increase": round(percentage_increase, 2) if previous_count > 0 else "inf",
+                "message": f"Резкий рост негатива по теме '{topic}': {recent_count} за последнюю неделю (было {previous_count})."
+            })
+            
+    
+            
+        return sorted(alerts, key=lambda x: x["percentage_increase"] if isinstance(x["percentage_increase"], float) else float('inf'), reverse=True)
+            
+    
+            
+    
+            
+    async def get_negative_reviews_for_topic(
+            
+        session: AsyncSession,
+            
+        topic_name: str,
+            
+        start_date: datetime,
+            
+        end_date: datetime,
+            
+        limit: int = 20,
+            
+    ) -> List[str]:
+            
+        """
+            
+        Возвращает тексты негативных отзывов по заданной теме и периоду.
+            
+        """
+            
+        query = (
+            
+            select(Review.text)
+            
+            .join(ReviewTopic, Review.id == ReviewTopic.review_id)
+            
+            .join(Topic, ReviewTopic.topic_id == Topic.id)
+            
+            .where(
+            
+                Topic.name == topic_name,
+            
+                Review.date.between(start_date, end_date),
+            
+                ReviewTopic.sentiment == Sentiment.NEGATIVE
+            
+            )
+            
+            .order_by(Review.date.desc())
+            
+            .limit(limit)
+            
+        )
+            
+        
+            
+        
+            
+        
+            
+            result = await session.execute(query)
+            
+        
+            
+            return [row[0] for row in result.all()]
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        
+            
+        async def get_all_reviews_for_export(session: AsyncSession) -> List[Dict[str, Any]]:
+            
+        
+            
+            """
+            
+        
+            
+            Возвращает все отзывы с темами и тональностями для экспорта.
+            
+        
+            
+            """
+            
+        
+            
+            query = (
+            
+        
+            
+                select(Review)
+            
+        
+            
+                .options(selectinload(Review.review_topics).selectinload(ReviewTopic.topic))
+            
+        
+            
+                .order_by(Review.date.desc())
+            
+        
+            
+            )
+            
+        
+            
+            
+            
+        
+            
+            result = await session.execute(query)
+            
+        
+            
+            reviews = result.scalars().all()
+            
+        
+            
+            
+            
+        
+            
+            export_data = []
+            
+        
+            
+            for review in reviews:
+            
+        
+            
+                for rt in review.review_topics:
+            
+        
+            
+                    export_data.append({
+            
+        
+            
+                        "review_id": review.id,
+            
+        
+            
+                        "date": review.date.isoformat(),
+            
+        
+            
+                        "rating": review.rating,
+            
+        
+            
+                        "text": review.text,
+            
+        
+            
+                        "topic": rt.topic.name,
+            
+        
+            
+                        "sentiment": rt.sentiment.value,
+            
+        
+            
+                    })
+            
+        
+            
+                    
+            
+        
+            
+            return export_data
+            
+        
+            
+        
+            
+    

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter } from 'recharts'
 
 function App() {
   const [activeMenuItem, setActiveMenuItem] = useState('Кластеризация')
@@ -36,6 +36,28 @@ function App() {
   const [topicsStatisticsData, setTopicsStatisticsData] = useState(null)
   const [isLoadingTopicsStatistics, setIsLoadingTopicsStatistics] = useState(false)
   const [topicsStatisticsError, setTopicsStatisticsError] = useState(null)
+  const [heatmapData, setHeatmapData] = useState(null);
+  const [isLoadingHeatmap, setIsLoadingHeatmap] = useState(false);
+  const [heatmapError, setHeatmapError] = useState(null);
+
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [reportFormat, setReportFormat] = useState('excel');
+  const [selectedReportTopics, setSelectedReportTopics] = useState([]);
+
+  const [competitorData, setCompetitorData] = useState(null);
+  const [isLoadingCompetitors, setIsLoadingCompetitors] = useState(false);
+  const [competitorError, setCompetitorError] = useState(null);
+  const [selectedCompetitors, setSelectedCompetitors] = useState(["Sber", "Tinkoff"]);
+
+  const [alertsData, setAlertsData] = useState(null);
+  const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+  const [alertsError, setAlertsError] = useState(null);
+
+  const [recommendationsData, setRecommendationsData] = useState("");
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState(null);
+  const [selectedTopicForAnalysis, setSelectedTopicForAnalysis] = useState('Кредитные карты');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Функция для перевода названий тем на русский язык
   const translateTopicName = (topicName) => {
@@ -314,6 +336,91 @@ function App() {
     }
   }
 
+  const fetchHeatmapData = async () => {
+    setIsLoadingHeatmap(true);
+    setHeatmapError(null);
+    try {
+      const dateRangeAndMode = getDateRangeAndMode();
+      const response = await fetch('http://localhost:8000/api/dashboard/heatmap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          start_date: dateRangeAndMode.start_date,
+          end_date: dateRangeAndMode.end_date,
+          mode: dateRangeAndMode.mode, // mode is not strictly needed by endpoint, but good to pass
+        }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        setHeatmapData(data.data);
+      } else {
+        throw new Error('Invalid response format for heatmap');
+      }
+    } catch (error) {
+      console.error('Error fetching heatmap data:', error);
+      setHeatmapError(error.message);
+      // Mock data as per user request
+      const mockData = [
+        { period: '2024-01', topic: 'Ипотека', count: 5 },
+        { period: '2024-02', topic: 'Ипотека', count: 8 },
+        { period: '2024-01', topic: 'Кредитные карты', count: 12 },
+        { period: '2024-03', topic: 'Кредитные карты', count: 15 },
+        { period: '2024-02', topic: 'Автокредиты', count: 7 },
+        { period: '2024-03', topic: 'Автокредиты', count: 4 },
+        { period: '2024-04', topic: 'Дебетовые карты', count: 22 },
+        { period: '2024-05', topic: 'Дебетовые карты', count: 18 },
+      ];
+      setHeatmapData(mockData);
+    } finally {
+      setIsLoadingHeatmap(false);
+    }
+  };
+
+  const fetchRecommendations = async () => {
+    setIsLoadingRecommendations(true);
+    setRecommendationsError(null);
+    setRecommendationsData("");
+    try {
+      const dateRangeAndMode = getDateRangeAndMode();
+      const response = await fetch('http://localhost:8000/api/ai/recommendations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...dateRangeAndMode,
+          topics: [selectedTopicForAnalysis],
+        }),
+      });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        setRecommendationsData(data.data);
+      } else {
+        throw new Error(data.detail || 'Invalid response format for recommendations');
+      }
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      setRecommendationsError(error.message);
+      setRecommendationsData(
+`### Рекомендации по улучшению продукта/услуги: Ипотека
+
+**1. Проблема: Длительное рассмотрение ипотечных заявок.**
+    *   **Рекомендация 1:** Внедрить систему скоринга на основе ИИ для автоматической проверки базовых критериев заемщика, что сократит время предварительного одобрения до 15 минут.
+    *   **Рекомендация 2:** Создать в мобильном приложении "трекер заявки", который будет наглядно показывать клиенту, на каком этапе находится его обращение (проверка документов, оценка недвижимости, финальное одобрение).
+
+**2. Проблема: Клиенты жалуются на некомпетентность менеджеров по ипотеке.**
+    *   **Рекомендация 1:** Организовать ежеквартальные обязательные тренинги и аттестацию для ипотечных специалистов по последним изменениям в законодательстве и внутренних программах банка.
+    *   **Рекомендация 2:** Разработать и внедрить единую базу знаний (wiki) по ипотечным продуктам, доступную всем сотрудникам, для быстрого поиска ответов на сложные вопросы клиентов.
+
+**3. Проблема: Непрозрачные условия страхования, навязывание дополнительных услуг.**
+    *   **Рекомендация 1:** Предоставлять клиенту на выбор список из как минимум 3-5 аккредитованных страховых компаний с четким указанием стоимости полиса в каждой.
+    *   **Рекомендация 2:** Разработать интерактивный калькулятор на сайте, который будет наглядно показывать, как меняется ежемесячный платеж и общая переплата при отказе от тех или иных "добровольных" страховок.
+`);
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  };
+
   // Функция для форматирования данных оси X в зависимости от режима
   const formatXAxisLabel = (period, mode) => {
     const date = new Date(period)
@@ -326,7 +433,7 @@ function App() {
         const weekNumber = Math.ceil((date - new Date(date.getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
         return `${weekNumber}н`
       case 'all:month':
-        return date.toLocaleDateString('ru-RU', { month: '2-digit', year: 'numeric' })
+        return date.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' })
       default:
         return date.toLocaleDateString('ru-RU', { month: 'short' })
     }
@@ -336,6 +443,7 @@ function App() {
   useEffect(() => {
     fetchAvailableTopics()
     fetchDashboardData()
+    fetchHeatmapData()
   }, [])
 
   // Загружаем данные тональности и статистики при изменении selectedClass
@@ -350,6 +458,7 @@ function App() {
     fetchDashboardData()
     fetchSentimentData(selectedClass)
     fetchTopicsStatisticsData(selectedClass)
+    fetchHeatmapData()
   }, [selectedTimeRange, customDateRange])
 
   // Функции для работы с файлами
@@ -487,8 +596,15 @@ function App() {
   }
 
   const menuItems = [
-    'Кластеризация', 
+    'Кластеризация',
+    'Тепловые карты',
+    'Сравнение с конкурентами',
+    'Рекомендации ИИ',
     'Тестирование',
+    'Генерация отчётов',
+    'Оповещения',
+    'Экспорт в BI',
+    'Документация',
   ]
 
   // Mock данные для графика отзывов - реальные данные по отзывам Газпромбанка
@@ -1331,7 +1447,453 @@ function App() {
     </>
   )
 
+  const renderHeatmapPage = () => {
+    const processHeatmapData = () => {
+      if (!heatmapData) return { data: [], xLabels: [], yLabels: [] };
 
+      const xLabels = [...new Set(heatmapData.map(d => d.period))].sort();
+      const yLabels = [...new Set(heatmapData.map(d => translateTopicName(d.topic)))].sort();
+      
+      const data = heatmapData.map(d => ({
+        x: xLabels.indexOf(d.period),
+        y: yLabels.indexOf(translateTopicName(d.topic)),
+        z: d.count,
+        label: `${translateTopicName(d.topic)} - ${d.period}: ${d.count} негативных`,
+      }));
+
+      return { data, xLabels, yLabels };
+    };
+
+    const { data, xLabels, yLabels } = processHeatmapData();
+    const maxCount = Math.max(...heatmapData?.map(d => d.count) || [0]);
+
+    const getColor = (value) => {
+      if (value === 0) return '#eff6ff';
+      const percentage = maxCount > 0 ? value / maxCount : 0;
+      if (percentage < 0.2) return '#bddbff';
+      if (percentage < 0.4) return '#60a5fa';
+      if (percentage < 0.6) return '#2563eb';
+      if (percentage < 0.8) return '#1d4ed8';
+      return '#1e3a8a';
+    };
+
+    const CustomTooltip = ({ active, payload }) => {
+      if (active && payload && payload.length) {
+        return (
+          <div className="tooltip">
+            <p className="tooltip__value">{payload[0].payload.label}</p>
+          </div>
+        );
+      }
+      return null;
+    };
+    
+    return (
+      <>
+        <div className="main__header">
+          <h1 className="main__title">Тепловая карта негатива</h1>
+        </div>
+
+        <div className="time-range-selector">
+          <div className="time-range-selector__container">
+            <div className="time-range-selector__label">
+              <span>Временной диапазон:</span>
+            </div>
+            <div className="time-range-selector__options">
+              {timeRangeOptions.filter(option => option.id !== 'custom').map((option) => (
+                <label key={option.id} className="time-range-option">
+                  <input
+                    type="radio"
+                    name="time-range-heatmap"
+                    value={option.id}
+                    checked={selectedTimeRange === option.id}
+                    onChange={(e) => setSelectedTimeRange(e.target.value)}
+                  />
+                  <span className="time-range-option__label">{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          {isLoadingHeatmap ? (
+            <div className="pie-chart__loading">
+              <div className="pie-chart__loading-spinner"></div>
+              <span className="pie-chart__loading-text">Загрузка данных для карты...</span>
+            </div>
+          ) : heatmapError ? (
+            <div className="pie-chart__error">
+              <div className="pie-chart__error-icon">⚠️</div>
+              <span className="pie-chart__error-text">Ошибка: {heatmapError} (загружены mock данные)</span>
+            </div>
+          ) : null}
+          {heatmapData && (
+            <ResponsiveContainer width="100%" height={Math.max(400, yLabels.length * 40)}>
+              <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 150 }}>
+                <XAxis
+                  dataKey="x"
+                  type="number"
+                  name="Период"
+                  domain={[ -0.5, xLabels.length - 0.5]}
+                  tickCount={xLabels.length}
+                  tickFormatter={(tick) => xLabels[tick]}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  interval={0}
+                />
+                <YAxis
+                  dataKey="y"
+                  type="number"
+                  name="Категория"
+                  domain={[ -0.5, yLabels.length - 0.5]}
+                  tickCount={yLabels.length}
+                  tickFormatter={(tick) => yLabels[tick]}
+                  width={150}
+                  interval={0}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+                <Scatter name="Негативные отзывы" data={data} shape="square" fill="#8884d8">
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={getColor(entry.z)} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </>
+    );
+  };
+
+
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const dateRangeAndMode = getDateRangeAndMode();
+      const response = await fetch('http://localhost:8000/api/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...dateRangeAndMode,
+          // Workaround: Pass format and topics via the 'topics' field
+          topics: [reportFormat, ...selectedReportTopics],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ошибка сети: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report.${reportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Ошибка при генерации отчета:", error);
+      alert("Не удалось сгенерировать отчет. Пожалуйста, проверьте консоль для получения дополнительной информации.");
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  const renderReportsPage = () => {
+    const handleTopicSelection = (topicId) => {
+      setSelectedReportTopics(prev => 
+        prev.includes(topicId) 
+          ? prev.filter(t => t !== topicId)
+          : [...prev, topicId]
+      );
+    };
+
+    return (
+      <>
+        <div className="main__header">
+          <h1 className="main__title">Генерация отчётов</h1>
+        </div>
+        <div className="card" style={{ maxWidth: '800px' }}>
+          <div className="report-generator">
+            <div className="report-section">
+              <h4>1. Выберите временной диапазон</h4>
+                <div className="time-range-selector" style={{margin: 0, padding: 0}}>
+                  <div className="time-range-selector__options" style={{flexDirection: 'column', alignItems: 'flex-start'}}>
+                    {timeRangeOptions.map((option) => (
+                      <label key={option.id} className="time-range-option">
+                        <input
+                          type="radio"
+                          name="time-range-report"
+                          value={option.id}
+                          checked={selectedTimeRange === option.id}
+                          onChange={(e) => setSelectedTimeRange(e.target.value)}
+                        />
+                        <span className="time-range-option__label">{option.label}</span>
+                      </label>
+                    ))}
+                  </div>
+              </div>
+            </div>
+
+            <div className="report-section">
+              <h4>2. Выберите темы для отчета</h4>
+              <div className="topic-selection-list">
+                {availableTopics.filter(t => t.id !== 'Все').map(topic => (
+                  <label key={topic.id} className="topic-checkbox">
+                    <input 
+                      type="checkbox"
+                      checked={selectedReportTopics.includes(topic.id)}
+                      onChange={() => handleTopicSelection(topic.id)}
+                    />
+                    {topic.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="report-section">
+              <h4>3. Выберите формат</h4>
+              <div className="format-selection">
+                <label className="time-range-option">
+                  <input type="radio" value="excel" checked={reportFormat === 'excel'} onChange={(e) => setReportFormat(e.target.value)} />
+                  <span className="time-range-option__label">Excel (.xlsx)</span>
+                </label>
+                <label className="time-range-option">
+                  <input type="radio" value="pdf" checked={reportFormat === 'pdf'} onChange={(e) => setReportFormat(e.target.value)} />
+                   <span className="time-range-option__label">PDF (.pdf)</span>
+                </label>
+              </div>
+            </div>
+
+            <button onClick={handleGenerateReport} disabled={isGeneratingReport} className="download-button">
+              {isGeneratingReport ? 'Генерация...' : 'Сгенерировать отчёт'}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+
+
+
+
+  const renderRecommendationsPage = () => {
+    return (
+        <>
+            <div className="main__header">
+                <h1 className="main__title">Рекомендации от ИИ</h1>
+            </div>
+
+            <div className="recommendation-page">
+                <div className="recommendation-controls card">
+                    <h4>Анализ негативных отзывов</h4>
+                    <p>Выберите тему, чтобы получить от ИИ-аналитика конкретные рекомендации по улучшению.</p>
+                    <select 
+                        value={selectedTopicForAnalysis} 
+                        onChange={(e) => setSelectedTopicForAnalysis(e.target.value)}
+                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                    >
+                        {availableTopics.filter(t => t.id !== 'Все').map(topic => (
+                            <option key={topic.id} value={topic.id}>{topic.label}</option>
+                        ))}
+                    </select>
+                    <button onClick={fetchRecommendations} disabled={isLoadingRecommendations} className="download-button" style={{width: 'auto'}}>
+                        {isLoadingRecommendations ? 'Анализ...' : 'Сгенерировать рекомендации'}
+                    </button>
+                </div>
+
+                <div className="card">
+                    {isLoadingRecommendations && <p>ИИ-аналитик изучает отзывы...</p>}
+                    {recommendationsError && <p style={{color: 'red'}}>Ошибка: {recommendationsError}</p>}
+                    {recommendationsData && (
+                        <div className="recommendation-output">
+                            <pre>{recommendationsData}</pre>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+  };
+
+  const renderCompetitorPage = () => {
+    const competitorList = ["Sber", "Tinkoff", "VTB", "Alfa-Bank"];
+    const handleCompetitorSelection = (bankName) => {
+        setSelectedCompetitors(prev => 
+            prev.includes(bankName) 
+              ? prev.filter(b => b !== bankName)
+              : [...prev, bankName]
+        );
+    };
+
+    return (
+        <>
+            <div className="main__header">
+                <h1 className="main__title">Сравнение с конкурентами</h1>
+            </div>
+
+            <div className="competitor-page">
+                <div className="competitor-filters card">
+                    <h4>Выберите конкурентов для сравнения</h4>
+                    <div className="topic-selection-list">
+                        {competitorList.map(bank => (
+                            <label key={bank} className="topic-checkbox">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedCompetitors.includes(bank)}
+                                    onChange={() => handleCompetitorSelection(bank)}
+                                />
+                                {bank}
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="card">
+                    <h4>Сравнение по NPS (Net Promoter Score)</h4>
+                    {isLoadingCompetitors ? (
+                        <p>Загрузка данных...</p>
+                    ) : competitorError ? (
+                        <p>Ошибка: {competitorError} (Загружены mock данные)</p>
+                    ) : null}
+                    {competitorData && (
+                        <ResponsiveContainer width="100%" height={400}>
+                            <BarChart data={competitorData} layout="vertical" margin={{ left: 100 }}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" domain={[-100, 100]} />
+                                <YAxis dataKey="bank_name" type="category" />
+                                <Tooltip />
+                                <Bar dataKey="nps_score" name="NPS">
+                                    {competitorData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.bank_name === 'Gazprombank' ? '#2b61ec' : '#64748b'} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+  };
+
+  const renderAlertsPage = () => (
+    <>
+      <div className="main__header">
+        <h1 className="main__title">Оповещения о резких изменениях</h1>
+      </div>
+      <div className="alerts-page">
+        {isLoadingAlerts ? (
+          <div className="pie-chart__loading">
+            <div className="pie-chart__loading-spinner"></div>
+            <span className="pie-chart__loading-text">Загрузка оповещений...</span>
+          </div>
+        ) : alertsError ? (
+           <div className="pie-chart__error">
+              <div className="pie-chart__error-icon">⚠️</div>
+              <span className="pie-chart__error-text">Ошибка: {alertsError} (загружены mock данные)</span>
+            </div>
+        ) : alertsData && alertsData.length > 0 ? (
+          alertsData.map((alert, index) => (
+            <div key={index} className="alert-card alert-card--danger">
+              <h4 className="alert-card__title">Резкий рост негатива: {translateTopicName(alert.topic)}</h4>
+              <p className="alert-card__message">
+                {alert.message} 
+                (Рост на <strong>{alert.percentage_increase === 'inf' ? '∞' : `${alert.percentage_increase}%`}</strong>)
+              </p>
+            </div>
+          ))
+        ) : (
+          <p>Нет активных оповещений.</p>
+        )}
+      </div>
+    </>
+  );
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/export/reviews');
+      if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'reviews_export.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export CSV:", error);
+      alert("Failed to export CSV. Please check the console for more information.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const renderExportPage = () => (
+    <>
+      <div className="main__header">
+        <h1 className="main__title">Экспорт данных в BI</h1>
+      </div>
+      <div className="card" style={{ maxWidth: '600px' }}>
+        <h4>Экспорт всех отзывов</h4>
+        <p style={{ margin: '16px 0' }}>Нажмите кнопку ниже, чтобы скачать все обработанные отзывы с темами и тональностями в формате CSV. Этот файл можно легко импортировать в любую BI-систему (Power BI, Tableau, etc.) для дальнейшего анализа.</p>
+        <button onClick={handleExportCsv} disabled={isExporting} className="download-button">
+          {isExporting ? 'Экспорт...' : 'Скачать CSV'}
+        </button>
+      </div>
+    </>
+  );
+
+  const renderDocumentationPage = () => (
+    <>
+      <div className="main__header">
+        <h1 className="main__title">Документация</h1>
+      </div>
+      <div className="documentation">
+        <div className="documentation__section">
+          <div className="documentation__card">
+            <div className="documentation__card-header">
+              <div className="documentation__icon">🚀</div>
+              <h2 className="documentation__card-title">Быстрый старт</h2>
+            </div>
+            <div className="documentation__card-content">
+              <p>Добро пожаловать в ИИ-дашборд для аналитиков Газпромбанка! Эта система предназначена для сбора, анализа и визуализации клиентских отзывов.</p>
+            </div>
+          </div>
+        </div>
+        <div className="documentation__section">
+            <h2 className="documentation__section-title">Функционал</h2>
+            <div className="documentation__features">
+                <div className="documentation__feature"><h3>Кластеризация</h3><p>Анализ динамики и распределения отзывов по темам и тональности.</p></div>
+                <div className="documentation__feature"><h3>Тепловые карты</h3><p>Визуализация концентрации негативных отзывов по темам и месяцам.</p></div>
+                <div className="documentation__feature"><h3>Сравнение с конкурентами</h3><p>Сравнение ключевых метрик (NPS, средний рейтинг) с другими банками.</p></div>
+                <div className="documentation__feature"><h3>Рекомендации ИИ</h3><p>Получение автоматических рекомендаций по улучшению на основе анализа негативных отзывов.</p></div>
+                <div className="documentation__feature"><h3>Генерация отчётов</h3><p>Создание и скачивание аналитических отчетов в форматах PDF и Excel.</p></div>
+                <div className="documentation__feature"><h3>Оповещения</h3><p>Отслеживание резких скачков негативной тональности по различным темам.</p></div>
+                <div className="documentation__feature"><h3>Экспорт в BI</h3><p>Выгрузка всех данных в формате CSV для импорта в Power BI, Tableau и другие системы.</p></div>
+            </div>
+        </div>
+      </div>
+    </>
+  );
+
+  const renderGenericPage = (title) => (
+    <>
+      <div className="main__header">
+        <h1 className="main__title">{title}</h1>
+      </div>
+      <p>Страница в разработке...</p>
+    </>
+  );
 
   return (
     <div className="app">
@@ -1394,6 +1956,13 @@ function App() {
       <main className="main">
         {activeMenuItem === 'Кластеризация' && renderClusteringPage()}
         {activeMenuItem === 'Тестирование' && renderTestingPage()}
+        {activeMenuItem === 'Тепловые карты' && renderHeatmapPage()}
+        {activeMenuItem === 'Сравнение с конкурентами' && renderCompetitorPage()}
+        {activeMenuItem === 'Рекомендации ИИ' && renderRecommendationsPage()}
+        {activeMenuItem === 'Генерация отчётов' && renderReportsPage()}
+        {activeMenuItem === 'Оповещения' && renderAlertsPage()}
+        {activeMenuItem === 'Экспорт в BI' && renderExportPage()}
+        {activeMenuItem === 'Документация' && renderDocumentationPage()}
       </main>
     </div>
   )
