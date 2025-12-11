@@ -71,3 +71,7 @@ tmp/
 temp/
 *.tmp
 
+.kiro/
+.kiro
+.vscode/
+.vscode
