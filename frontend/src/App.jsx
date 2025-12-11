@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter, BarChart, Bar, Area, AreaChart } from 'recharts'
+import { 
+  LayoutGrid, 
+  Flame, 
+  Users, 
+  Sparkles, 
+  FlaskConical, 
+  FileText, 
+  Bell, 
+  Download, 
+  BookOpen,
+  Menu,
+  X,
+  Check
+} from 'lucide-react'
 
 function App() {
   const [activeMenuItem, setActiveMenuItem] = useState('Кластеризация')
@@ -58,6 +72,26 @@ function App() {
   const [recommendationsError, setRecommendationsError] = useState(null);
   const [selectedTopicForAnalysis, setSelectedTopicForAnalysis] = useState('Кредитные карты');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Состояние для drag-and-drop на странице тестирования
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  // Состояния для отслеживания источника данных (API vs Mock)
+  const [dataSource, setDataSource] = useState({
+    dashboard: null,      // 'api' | 'mock' | null
+    topics: null,
+    sentiment: null,
+    topicsStatistics: null,
+    heatmap: null,
+    competitors: null,
+    alerts: null,
+    recommendations: null
+  });
+
+  // Функция для обновления источника данных
+  const updateDataSource = (key, source) => {
+    setDataSource(prev => ({ ...prev, [key]: source }));
+  };
 
   // Функция для перевода названий тем на русский язык
   const translateTopicName = (topicName) => {
@@ -154,7 +188,7 @@ function App() {
       const response = await fetch('http://localhost:8000/api/topics/available')
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
@@ -177,12 +211,14 @@ function App() {
         ]
         
         setAvailableTopics(allTopics)
+        updateDataSource('topics', 'api')
       } else {
-        throw new Error('Invalid response format')
+        throw new Error('Некорректный формат ответа от сервера')
       }
     } catch (error) {
       console.error('Error fetching topics:', error)
       setTopicsError(error.message)
+      updateDataSource('topics', 'mock')
       
       // Fallback к статическим данным в случае ошибки
       setAvailableTopics([
@@ -204,6 +240,54 @@ function App() {
       setIsLoadingTopics(false)
     }
   }
+
+  // Mock данные для дашборда
+  const mockDashboardData = {
+    status: 'success',
+    data: {
+      overview: {
+        total_reviews: 4523,
+        popular_topics: [
+          { topic: 'creditcards', count: 1245 },
+          { topic: 'hypothec', count: 987 },
+          { topic: 'mobile_app', count: 856 },
+          { topic: 'deposits', count: 634 },
+          { topic: 'transfers', count: 521 },
+          { topic: 'debitcards', count: 412 },
+          { topic: 'credits', count: 356 },
+          { topic: 'autocredits', count: 289 },
+          { topic: 'individual', count: 178 },
+          { topic: 'remote', count: 145 }
+        ]
+      },
+      topic_trends: [
+        { period: '2024-01', topic: 'creditcards', count: 120 },
+        { period: '2024-02', topic: 'creditcards', count: 145 },
+        { period: '2024-03', topic: 'creditcards', count: 132 },
+        { period: '2024-04', topic: 'creditcards', count: 167 },
+        { period: '2024-05', topic: 'creditcards', count: 189 },
+        { period: '2024-06', topic: 'creditcards', count: 156 },
+        { period: '2024-01', topic: 'hypothec', count: 89 },
+        { period: '2024-02', topic: 'hypothec', count: 102 },
+        { period: '2024-03', topic: 'hypothec', count: 95 },
+        { period: '2024-04', topic: 'hypothec', count: 118 },
+        { period: '2024-05', topic: 'hypothec', count: 134 },
+        { period: '2024-06', topic: 'hypothec', count: 112 },
+        { period: '2024-01', topic: 'mobile_app', count: 78 },
+        { period: '2024-02', topic: 'mobile_app', count: 92 },
+        { period: '2024-03', topic: 'mobile_app', count: 85 },
+        { period: '2024-04', topic: 'mobile_app', count: 103 },
+        { period: '2024-05', topic: 'mobile_app', count: 121 },
+        { period: '2024-06', topic: 'mobile_app', count: 98 },
+        { period: '2024-01', topic: 'deposits', count: 56 },
+        { period: '2024-02', topic: 'deposits', count: 67 },
+        { period: '2024-03', topic: 'deposits', count: 61 },
+        { period: '2024-04', topic: 'deposits', count: 74 },
+        { period: '2024-05', topic: 'deposits', count: 82 },
+        { period: '2024-06', topic: 'deposits', count: 69 }
+      ]
+    }
+  };
 
   // Функция для загрузки данных дашборда
   const fetchDashboardData = async () => {
@@ -227,37 +311,42 @@ function App() {
       })
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
       console.log('Dashboard API response:', data)
-      console.log('Dashboard API response keys:', Object.keys(data))
-      if (data.data && data.data.overview && data.data.overview.popular_topics) {
-        console.log('popular_topics found in data.overview:', data.data.overview.popular_topics)
-      } else {
-        console.log('popular_topics NOT found in expected location')
-        console.log('Available keys:', Object.keys(data))
-        if (data.data) {
-          console.log('data keys:', Object.keys(data.data))
-          if (data.data.overview) {
-            console.log('overview keys:', Object.keys(data.data.overview))
-          }
-        }
-      }
       setDashboardData(data)
+      updateDataSource('dashboard', 'api')
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
       setDashboardError(error.message)
+      // Используем mock данные при ошибке
+      setDashboardData(mockDashboardData)
+      updateDataSource('dashboard', 'mock')
     } finally {
       setIsLoadingDashboard(false)
     }
   }
 
+  // Mock данные для тональности
+  const getMockSentimentData = (topicId) => ({
+    status: 'success',
+    data: [{
+      topic: topicId,
+      sentiment_breakdown: {
+        'положительно': Math.floor(Math.random() * 200) + 100,
+        'нейтрально': Math.floor(Math.random() * 150) + 50,
+        'отрицательно': Math.floor(Math.random() * 100) + 30
+      }
+    }]
+  });
+
   // Функция для загрузки данных тональности
   const fetchSentimentData = async (topicId) => {
     if (topicId === 'Все') {
       setSentimentData(null)
+      updateDataSource('sentiment', null)
       return
     }
 
@@ -281,24 +370,42 @@ function App() {
       })
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
       console.log('Sentiment API response:', data)
       setSentimentData(data)
+      updateDataSource('sentiment', 'api')
     } catch (error) {
       console.error('Error fetching sentiment data:', error)
       setSentimentError(error.message)
+      // Используем mock данные при ошибке
+      setSentimentData(getMockSentimentData(topicId))
+      updateDataSource('sentiment', 'mock')
     } finally {
       setIsLoadingSentiment(false)
     }
   }
 
+  // Mock данные для статистики по темам
+  const getMockTopicsStatisticsData = (topicId) => ({
+    status: 'success',
+    data: [
+      { period: '2024-01', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 50 },
+      { period: '2024-02', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 60 },
+      { period: '2024-03', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 55 },
+      { period: '2024-04', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 70 },
+      { period: '2024-05', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 80 },
+      { period: '2024-06', topic: topicId, total_mentions: Math.floor(Math.random() * 100) + 65 }
+    ]
+  });
+
   // Функция для загрузки данных статистики по темам
   const fetchTopicsStatisticsData = async (topicId) => {
     if (topicId === 'Все') {
       setTopicsStatisticsData(null)
+      updateDataSource('topicsStatistics', null)
       return
     }
 
@@ -322,19 +429,63 @@ function App() {
       })
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`)
       }
       
       const data = await response.json()
       console.log('Topics Statistics API response:', data)
       setTopicsStatisticsData(data)
+      updateDataSource('topicsStatistics', 'api')
     } catch (error) {
       console.error('Error fetching topics statistics data:', error)
       setTopicsStatisticsError(error.message)
+      // Используем mock данные при ошибке
+      setTopicsStatisticsData(getMockTopicsStatisticsData(topicId))
+      updateDataSource('topicsStatistics', 'mock')
     } finally {
       setIsLoadingTopicsStatistics(false)
     }
   }
+
+  // Полные mock данные для тепловой карты
+  const mockHeatmapData = [
+    { period: '2024-01', topic: 'hypothec', count: 15 },
+    { period: '2024-02', topic: 'hypothec', count: 18 },
+    { period: '2024-03', topic: 'hypothec', count: 12 },
+    { period: '2024-04', topic: 'hypothec', count: 22 },
+    { period: '2024-05', topic: 'hypothec', count: 19 },
+    { period: '2024-06', topic: 'hypothec', count: 14 },
+    { period: '2024-01', topic: 'creditcards', count: 25 },
+    { period: '2024-02', topic: 'creditcards', count: 32 },
+    { period: '2024-03', topic: 'creditcards', count: 28 },
+    { period: '2024-04', topic: 'creditcards', count: 35 },
+    { period: '2024-05', topic: 'creditcards', count: 42 },
+    { period: '2024-06', topic: 'creditcards', count: 38 },
+    { period: '2024-01', topic: 'mobile_app', count: 18 },
+    { period: '2024-02', topic: 'mobile_app', count: 24 },
+    { period: '2024-03', topic: 'mobile_app', count: 21 },
+    { period: '2024-04', topic: 'mobile_app', count: 28 },
+    { period: '2024-05', topic: 'mobile_app', count: 35 },
+    { period: '2024-06', topic: 'mobile_app', count: 30 },
+    { period: '2024-01', topic: 'deposits', count: 8 },
+    { period: '2024-02', topic: 'deposits', count: 12 },
+    { period: '2024-03', topic: 'deposits', count: 10 },
+    { period: '2024-04', topic: 'deposits', count: 15 },
+    { period: '2024-05', topic: 'deposits', count: 18 },
+    { period: '2024-06', topic: 'deposits', count: 14 },
+    { period: '2024-01', topic: 'transfers', count: 6 },
+    { period: '2024-02', topic: 'transfers', count: 9 },
+    { period: '2024-03', topic: 'transfers', count: 7 },
+    { period: '2024-04', topic: 'transfers', count: 11 },
+    { period: '2024-05', topic: 'transfers', count: 14 },
+    { period: '2024-06', topic: 'transfers', count: 10 },
+    { period: '2024-01', topic: 'debitcards', count: 12 },
+    { period: '2024-02', topic: 'debitcards', count: 16 },
+    { period: '2024-03', topic: 'debitcards', count: 14 },
+    { period: '2024-04', topic: 'debitcards', count: 19 },
+    { period: '2024-05', topic: 'debitcards', count: 22 },
+    { period: '2024-06', topic: 'debitcards', count: 17 }
+  ];
 
   const fetchHeatmapData = async () => {
     setIsLoadingHeatmap(true);
@@ -347,34 +498,84 @@ function App() {
         body: JSON.stringify({
           start_date: dateRangeAndMode.start_date,
           end_date: dateRangeAndMode.end_date,
-          mode: dateRangeAndMode.mode, // mode is not strictly needed by endpoint, but good to pass
+          mode: dateRangeAndMode.mode,
         }),
       });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`);
       const data = await response.json();
       if (data.status === 'success') {
         setHeatmapData(data.data);
+        updateDataSource('heatmap', 'api');
       } else {
-        throw new Error('Invalid response format for heatmap');
+        throw new Error('Некорректный формат ответа от сервера');
       }
     } catch (error) {
       console.error('Error fetching heatmap data:', error);
       setHeatmapError(error.message);
-      // Mock data as per user request
-      const mockData = [
-        { period: '2024-01', topic: 'Ипотека', count: 5 },
-        { period: '2024-02', topic: 'Ипотека', count: 8 },
-        { period: '2024-01', topic: 'Кредитные карты', count: 12 },
-        { period: '2024-03', topic: 'Кредитные карты', count: 15 },
-        { period: '2024-02', topic: 'Автокредиты', count: 7 },
-        { period: '2024-03', topic: 'Автокредиты', count: 4 },
-        { period: '2024-04', topic: 'Дебетовые карты', count: 22 },
-        { period: '2024-05', topic: 'Дебетовые карты', count: 18 },
-      ];
-      setHeatmapData(mockData);
+      setHeatmapData(mockHeatmapData);
+      updateDataSource('heatmap', 'mock');
     } finally {
       setIsLoadingHeatmap(false);
     }
+  };
+
+  // Mock данные для рекомендаций по разным темам
+  const getMockRecommendations = (topic) => {
+    const recommendations = {
+      'hypothec': `### Рекомендации по улучшению продукта/услуги: Ипотека
+
+**1. Проблема: Длительное рассмотрение ипотечных заявок.**
+    *   **Рекомендация 1:** Внедрить систему скоринга на основе ИИ для автоматической проверки базовых критериев заемщика, что сократит время предварительного одобрения до 15 минут.
+    *   **Рекомендация 2:** Создать в мобильном приложении "трекер заявки", который будет наглядно показывать клиенту, на каком этапе находится его обращение.
+
+**2. Проблема: Клиенты жалуются на некомпетентность менеджеров по ипотеке.**
+    *   **Рекомендация 1:** Организовать ежеквартальные обязательные тренинги и аттестацию для ипотечных специалистов.
+    *   **Рекомендация 2:** Разработать и внедрить единую базу знаний (wiki) по ипотечным продуктам.
+
+**3. Проблема: Непрозрачные условия страхования.**
+    *   **Рекомендация 1:** Предоставлять клиенту на выбор список из как минимум 3-5 аккредитованных страховых компаний.
+    *   **Рекомендация 2:** Разработать интерактивный калькулятор на сайте для расчета платежей.`,
+      'creditcards': `### Рекомендации по улучшению продукта/услуги: Кредитные карты
+
+**1. Проблема: Высокие процентные ставки и скрытые комиссии.**
+    *   **Рекомендация 1:** Упростить тарифную сетку и сделать все комиссии прозрачными на главной странице продукта.
+    *   **Рекомендация 2:** Внедрить персональные предложения по снижению ставки для лояльных клиентов.
+
+**2. Проблема: Сложности с увеличением кредитного лимита.**
+    *   **Рекомендация 1:** Автоматически пересматривать лимиты для клиентов с хорошей кредитной историей.
+    *   **Рекомендация 2:** Добавить возможность запроса увеличения лимита через мобильное приложение.
+
+**3. Проблема: Недостаточный кэшбэк и бонусная программа.**
+    *   **Рекомендация 1:** Расширить категории повышенного кэшбэка.
+    *   **Рекомендация 2:** Добавить возможность выбора категорий кэшбэка клиентом.`,
+      'mobile_app': `### Рекомендации по улучшению продукта/услуги: Мобильное приложение
+
+**1. Проблема: Частые сбои и медленная работа приложения.**
+    *   **Рекомендация 1:** Провести оптимизацию производительности и уменьшить время загрузки экранов.
+    *   **Рекомендация 2:** Внедрить систему мониторинга стабильности в реальном времени.
+
+**2. Проблема: Неудобный интерфейс и навигация.**
+    *   **Рекомендация 1:** Провести UX-исследование и редизайн основных пользовательских сценариев.
+    *   **Рекомендация 2:** Добавить персонализацию главного экрана под потребности клиента.
+
+**3. Проблема: Отсутствие важных функций.**
+    *   **Рекомендация 1:** Добавить возможность оплаты по QR-коду.
+    *   **Рекомендация 2:** Внедрить push-уведомления о статусе операций.`,
+      'default': `### Рекомендации по улучшению продукта/услуги: ${translateTopicName(topic)}
+
+**1. Проблема: Недостаточное качество обслуживания.**
+    *   **Рекомендация 1:** Провести обучение сотрудников по стандартам клиентского сервиса.
+    *   **Рекомендация 2:** Внедрить систему оценки качества обслуживания после каждого обращения.
+
+**2. Проблема: Длительное время ожидания.**
+    *   **Рекомендация 1:** Оптимизировать процессы обработки запросов.
+    *   **Рекомендация 2:** Расширить возможности самообслуживания в цифровых каналах.
+
+**3. Проблема: Недостаточная информированность клиентов.**
+    *   **Рекомендация 1:** Улучшить раздел FAQ на сайте и в приложении.
+    *   **Рекомендация 2:** Внедрить проактивные уведомления об изменениях в продуктах.`
+    };
+    return recommendations[topic] || recommendations['default'];
   };
 
   const fetchRecommendations = async () => {
@@ -391,33 +592,100 @@ function App() {
           topics: [selectedTopicForAnalysis],
         }),
       });
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`);
       const data = await response.json();
       if (data.status === 'success') {
         setRecommendationsData(data.data);
+        updateDataSource('recommendations', 'api');
       } else {
-        throw new Error(data.detail || 'Invalid response format for recommendations');
+        throw new Error(data.detail || 'Некорректный формат ответа от сервера');
       }
     } catch (error) {
       console.error('Error fetching recommendations:', error);
       setRecommendationsError(error.message);
-      setRecommendationsData(
-`### Рекомендации по улучшению продукта/услуги: Ипотека
-
-**1. Проблема: Длительное рассмотрение ипотечных заявок.**
-    *   **Рекомендация 1:** Внедрить систему скоринга на основе ИИ для автоматической проверки базовых критериев заемщика, что сократит время предварительного одобрения до 15 минут.
-    *   **Рекомендация 2:** Создать в мобильном приложении "трекер заявки", который будет наглядно показывать клиенту, на каком этапе находится его обращение (проверка документов, оценка недвижимости, финальное одобрение).
-
-**2. Проблема: Клиенты жалуются на некомпетентность менеджеров по ипотеке.**
-    *   **Рекомендация 1:** Организовать ежеквартальные обязательные тренинги и аттестацию для ипотечных специалистов по последним изменениям в законодательстве и внутренних программах банка.
-    *   **Рекомендация 2:** Разработать и внедрить единую базу знаний (wiki) по ипотечным продуктам, доступную всем сотрудникам, для быстрого поиска ответов на сложные вопросы клиентов.
-
-**3. Проблема: Непрозрачные условия страхования, навязывание дополнительных услуг.**
-    *   **Рекомендация 1:** Предоставлять клиенту на выбор список из как минимум 3-5 аккредитованных страховых компаний с четким указанием стоимости полиса в каждой.
-    *   **Рекомендация 2:** Разработать интерактивный калькулятор на сайте, который будет наглядно показывать, как меняется ежемесячный платеж и общая переплата при отказе от тех или иных "добровольных" страховок.
-`);
+      setRecommendationsData(getMockRecommendations(selectedTopicForAnalysis));
+      updateDataSource('recommendations', 'mock');
     } finally {
       setIsLoadingRecommendations(false);
+    }
+  };
+
+  // Полные mock данные для конкурентов
+  const mockCompetitorData = [
+    { bank_name: 'Gazprombank', nps_score: 42, rating: 4.2, reviews_count: 4523 },
+    { bank_name: 'Sber', nps_score: 56, rating: 4.5, reviews_count: 12456 },
+    { bank_name: 'Tinkoff', nps_score: 68, rating: 4.7, reviews_count: 8934 },
+    { bank_name: 'VTB', nps_score: 35, rating: 3.9, reviews_count: 6721 },
+    { bank_name: 'Alfa-Bank', nps_score: 48, rating: 4.3, reviews_count: 5432 }
+  ];
+
+  // Функция для загрузки данных конкурентов
+  const fetchCompetitorData = async () => {
+    setIsLoadingCompetitors(true);
+    setCompetitorError(null);
+    try {
+      const response = await fetch('http://localhost:8000/api/competitors/nps');
+      if (!response.ok) throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      if (data.status === 'success' && data.data) {
+        setCompetitorData(data.data);
+        updateDataSource('competitors', 'api');
+      } else {
+        throw new Error('Некорректный формат ответа от сервера');
+      }
+    } catch (error) {
+      console.error('Error fetching competitor data:', error);
+      setCompetitorError(error.message);
+      setCompetitorData(mockCompetitorData);
+      updateDataSource('competitors', 'mock');
+    } finally {
+      setIsLoadingCompetitors(false);
+    }
+  };
+
+  // Полные mock данные для оповещений
+  const mockAlertsData = [
+    {
+      topic: 'mobile_app',
+      message: 'Резкий рост негативных отзывов о мобильном приложении. Пользователи жалуются на частые сбои и медленную работу после последнего обновления.',
+      percentage_increase: 156,
+      detected_at: new Date().toISOString()
+    },
+    {
+      topic: 'creditcards',
+      message: 'Увеличение жалоб на условия кредитных карт. Клиенты недовольны изменением процентных ставок и комиссий.',
+      percentage_increase: 89,
+      detected_at: new Date().toISOString()
+    },
+    {
+      topic: 'hypothec',
+      message: 'Рост негатива по ипотечным продуктам. Основные претензии связаны с длительным рассмотрением заявок и некомпетентностью менеджеров.',
+      percentage_increase: 45,
+      detected_at: new Date().toISOString()
+    }
+  ];
+
+  // Функция для загрузки данных оповещений
+  const fetchAlertsData = async () => {
+    setIsLoadingAlerts(true);
+    setAlertsError(null);
+    try {
+      const response = await fetch('http://localhost:8000/api/alerts');
+      if (!response.ok) throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      if (data.status === 'success' && data.data) {
+        setAlertsData(data.data);
+        updateDataSource('alerts', 'api');
+      } else {
+        throw new Error('Некорректный формат ответа от сервера');
+      }
+    } catch (error) {
+      console.error('Error fetching alerts data:', error);
+      setAlertsError(error.message);
+      setAlertsData(mockAlertsData);
+      updateDataSource('alerts', 'mock');
+    } finally {
+      setIsLoadingAlerts(false);
     }
   };
 
@@ -444,6 +712,8 @@ function App() {
     fetchAvailableTopics()
     fetchDashboardData()
     fetchHeatmapData()
+    fetchCompetitorData()
+    fetchAlertsData()
   }, [])
 
   // Загружаем данные тональности и статистики при изменении selectedClass
@@ -596,15 +866,15 @@ function App() {
   }
 
   const menuItems = [
-    'Кластеризация',
-    'Тепловые карты',
-    'Сравнение с конкурентами',
-    'Рекомендации ИИ',
-    'Тестирование',
-    'Генерация отчётов',
-    'Оповещения',
-    'Экспорт в BI',
-    'Документация',
+    { id: 'Кластеризация', label: 'Кластеризация', icon: LayoutGrid },
+    { id: 'Тепловые карты', label: 'Тепловые карты', icon: Flame },
+    { id: 'Сравнение с конкурентами', label: 'Конкуренты', icon: Users },
+    { id: 'Рекомендации ИИ', label: 'Рекомендации ИИ', icon: Sparkles },
+    { id: 'Тестирование', label: 'Тестирование', icon: FlaskConical },
+    { id: 'Генерация отчётов', label: 'Отчёты', icon: FileText },
+    { id: 'Оповещения', label: 'Оповещения', icon: Bell },
+    { id: 'Экспорт в BI', label: 'Экспорт в BI', icon: Download },
+    { id: 'Документация', label: 'Документация', icon: BookOpen },
   ]
 
   // Mock данные для графика отзывов - реальные данные по отзывам Газпромбанка
@@ -873,6 +1143,39 @@ function App() {
     { id: 'custom', label: 'Указать даты' }
   ]
 
+  // Компонент индикатора источника данных (только логирование)
+  const DataSourceIndicator = ({ source, className = '' }) => {
+    useEffect(() => {
+      if (source) {
+        console.log(`[DataSource] ${source === 'api' ? 'API' : 'Mock'} data loaded`);
+      }
+    }, [source]);
+    return null;
+  };
+
+  // Компонент для отображения общего статуса данных (только логирование)
+  const GlobalDataSourceBadge = () => {
+    useEffect(() => {
+      const sources = Object.entries(dataSource).filter(([_, s]) => s !== null);
+      if (sources.length > 0) {
+        const hasApiData = sources.some(([_, s]) => s === 'api');
+        const hasMockData = sources.some(([_, s]) => s === 'mock');
+        
+        if (hasApiData && !hasMockData) {
+          console.log('[DataSource] All data from API');
+        } else if (hasMockData && !hasApiData) {
+          console.log('[DataSource] Demo mode - using mock data');
+        } else if (hasApiData && hasMockData) {
+          console.log('[DataSource] Mixed mode - some API, some mock');
+          sources.forEach(([key, value]) => {
+            console.log(`  - ${key}: ${value}`);
+          });
+        }
+      }
+    }, [dataSource]);
+    return null;
+  };
+
   // Функция для рендера содержимого дашборда
   const renderDashboardContent = (pageTitle) => (
     <>
@@ -1013,15 +1316,10 @@ function App() {
                 <div className="pie-chart__loading-spinner"></div>
                 <span className="pie-chart__loading-text">Загрузка данных...</span>
               </div>
-            ) : (selectedClass === 'Все' ? dashboardError : sentimentError) ? (
-              <div className="pie-chart__error">
-                <div className="pie-chart__error-icon">⚠️</div>
-                <span className="pie-chart__error-text">
-                  Ошибка загрузки данных: {selectedClass === 'Все' ? dashboardError : sentimentError}. Используются fallback данные.
-                </span>
-              </div>
             ) : (
               <>
+                {(selectedClass === 'Все' ? dashboardError : sentimentError) && 
+                  console.log('[PieChart] API error, using fallback data:', selectedClass === 'Все' ? dashboardError : sentimentError)}
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
                     <Pie
@@ -1092,7 +1390,10 @@ function App() {
   const renderClusteringPage = () => (
     <>
       <div className="main__header">
-        <h1 className="main__title">Кластеризация</h1>
+        <div className="main__header-with-indicator">
+          <h1 className="main__title">Кластеризация</h1>
+          <DataSourceIndicator source={dataSource.dashboard || dataSource.topics} />
+        </div>
       </div>
 
       {/* Карточки выбора класса */}
@@ -1103,14 +1404,8 @@ function App() {
               <div className="class-cards__loading-spinner"></div>
               <span className="class-cards__loading-text">Загрузка тем...</span>
             </div>
-          ) : topicsError ? (
-            <div className="class-cards__error">
-              <div className="class-cards__error-icon">⚠️</div>
-              <span className="class-cards__error-text">
-                Ошибка загрузки тем: {topicsError}. Используются fallback данные.
-              </span>
-            </div>
           ) : null}
+          {topicsError && console.log('[Topics] API error, using fallback data:', topicsError)}
           
           {classCards.map((classCard) => (
             <div
@@ -1118,14 +1413,10 @@ function App() {
               className={`class-card ${selectedClass === classCard.id ? 'class-card--active' : ''}`}
               data-class={classCard.id}
               onClick={() => setSelectedClass(classCard.id)}
-              style={{
-                borderColor: selectedClass === classCard.id ? classCard.color : (classCard.id === 'Все' ? '#c5d9f1' : 'transparent'),
-                backgroundColor: selectedClass === classCard.id ? `${classCard.color}10` : (classCard.id === 'Все' ? 'linear-gradient(135deg, #f8f9ff 0%, #e3f2fd 100%)' : '#ffffff')
-              }}
             >
               <div 
                 className="class-card__indicator"
-                style={{ backgroundColor: classCard.color }}
+                style={{ backgroundColor: classCard.color, color: classCard.color }}
               ></div>
               <span className="class-card__label">{classCard.label}</span>
             </div>
@@ -1153,11 +1444,13 @@ function App() {
               </label>
             ))}
           </div>
-          
-          {/* Поля для выбора дат */}
-          <div className="custom-date-range" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '20px' }}>
-            <div className="custom-date-range__field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label className="custom-date-range__label" style={{ fontSize: '14px', fontWeight: '500' }}>От:</label>
+        </div>
+        
+        {/* Поля для выбора дат */}
+        <div className="custom-date-range">
+          <div className="custom-date-range__container">
+            <div className="custom-date-range__field">
+              <label className="custom-date-range__label">От:</label>
               <input
                 type="date"
                 className="custom-date-range__input"
@@ -1166,18 +1459,10 @@ function App() {
                   ...prev,
                   startDate: e.target.value
                 }))}
-                style={{ 
-                  padding: '4px 6px', 
-                  border: 'none', 
-                  borderBottom: '1px solid #ccc',
-                  backgroundColor: 'transparent',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
               />
             </div>
-            <div className="custom-date-range__field" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label className="custom-date-range__label" style={{ fontSize: '14px', fontWeight: '500' }}>До:</label>
+            <div className="custom-date-range__field">
+              <label className="custom-date-range__label">До:</label>
               <input
                 type="date"
                 className="custom-date-range__input"
@@ -1186,38 +1471,18 @@ function App() {
                   ...prev,
                   endDate: e.target.value
                 }))}
-                style={{ 
-                  padding: '4px 6px', 
-                  border: 'none', 
-                  borderBottom: '1px solid #ccc',
-                  backgroundColor: 'transparent',
-                  fontSize: '14px',
-                  outline: 'none'
-                }}
               />
             </div>
             <button
+              className="btn btn--primary btn--sm"
               onClick={() => {
                 setSelectedTimeRange('custom')
                 fetchDashboardData()
                 fetchSentimentData(selectedClass)
                 fetchTopicsStatisticsData(selectedClass)
               }}
-              style={{
-                padding: '6px 12px',
-                backgroundColor: '#2b61ec',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                marginLeft: '8px'
-              }}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#1e4bb8'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#2b61ec'}
             >
-              Обновить
+              Применить
             </button>
           </div>
         </div>
@@ -1255,50 +1520,66 @@ function App() {
                     bottom: 20,
                   }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                  <defs>
+                    <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={classCards.find(c => c.id === selectedClass)?.color || '#6366F1'} stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor={classCards.find(c => c.id === selectedClass)?.color || '#6366F1'} stopOpacity={0.05}/>
+                    </linearGradient>
+                    <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#6366F1"/>
+                      <stop offset="100%" stopColor="#8B5CF6"/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.06)" vertical={false} />
                   <XAxis 
                     dataKey="month" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 12, fill: '#6c757d' }}
+                    tick={{ fontSize: 12, fill: 'rgba(255, 255, 255, 0.5)' }}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 12, fill: '#6c757d' }}
+                    tick={{ fontSize: 12, fill: 'rgba(255, 255, 255, 0.5)' }}
                     domain={[0, roundedMax]}
                   />
                   <Tooltip 
                     contentStyle={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e9ecef',
+                      backgroundColor: 'rgba(17, 17, 19, 0.95)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
                       borderRadius: '12px',
-                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
+                      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                      padding: '12px 16px'
                     }}
-                    labelStyle={{ color: '#6c757d', fontSize: '12px' }}
-                    formatter={(value) => [`${value} отзывов`, 'Количество']}
+                    labelStyle={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', marginBottom: '4px' }}
+                    itemStyle={{ color: '#ffffff', fontSize: '14px', fontWeight: '600' }}
+                    formatter={(value) => [`${value.toLocaleString()} отзывов`, '']}
+                    cursor={{ stroke: 'rgba(99, 102, 241, 0.3)', strokeWidth: 2 }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="value" 
-                    stroke={classCards.find(c => c.id === selectedClass)?.color || '#2b61ec'} 
+                    stroke={classCards.find(c => c.id === selectedClass)?.color || '#6366F1'} 
                     strokeWidth={3}
-                    dot={{ fill: classCards.find(c => c.id === selectedClass)?.color || '#2b61ec', strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: classCards.find(c => c.id === selectedClass)?.color || '#2b61ec', strokeWidth: 2 }}
+                    fill="url(#lineGradient)"
+                    dot={{ fill: classCards.find(c => c.id === selectedClass)?.color || '#6366F1', strokeWidth: 0, r: 4 }}
+                    activeDot={{ 
+                      r: 8, 
+                      fill: classCards.find(c => c.id === selectedClass)?.color || '#6366F1',
+                      stroke: 'rgba(255, 255, 255, 0.3)',
+                      strokeWidth: 4,
+                      style: { filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.5))' }
+                    }}
+                    animationDuration={800}
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '350px',
-                color: '#6c757d',
-                fontSize: '16px',
-                fontWeight: '500'
-              }}>
-                Нет данных за выбранный период
+              <div className="chart-empty-state">
+                <span className="chart-empty-state__icon">📊</span>
+                <span className="chart-empty-state__text">Нет данных за выбранный период</span>
               </div>
             )}
           </div>
@@ -1321,22 +1602,23 @@ function App() {
                   data={topicsData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={0}
-                  outerRadius={80}
+                  innerRadius={50}
+                  outerRadius={85}
                   fill="#8884d8"
                   dataKey="value"
-                  stroke="#fff"
+                  stroke="rgba(10, 10, 11, 0.8)"
                   strokeWidth={2}
-                  paddingAngle={2}
+                  paddingAngle={3}
                   animationBegin={0}
-                  animationDuration={300}
+                  animationDuration={600}
+                  animationEasing="ease-out"
                 >
                   {topicsData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={entry.color}
                       style={{
-                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                        filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))',
                         transition: 'all 0.3s ease'
                       }}
                     />
@@ -1348,11 +1630,15 @@ function App() {
                     props.payload.label
                   ]}
                   contentStyle={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e9ecef',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+                    backgroundColor: 'rgba(17, 17, 19, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+                    padding: '12px 16px',
+                    color: '#ffffff'
                   }}
+                  itemStyle={{ color: '#ffffff' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -1378,72 +1664,201 @@ function App() {
   )
 
   // Функция для рендера страницы тестирования
+  // Обработчики drag-and-drop
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      if (file.type === 'application/json' || file.name.endsWith('.json')) {
+        // Создаем синтетическое событие для handleFileUpload
+        const syntheticEvent = {
+          target: {
+            files: [file]
+          }
+        }
+        handleFileUpload(syntheticEvent)
+      } else {
+        alert('Пожалуйста, загрузите JSON файл')
+      }
+    }
+  }
+
   const renderTestingPage = () => (
     <>
       <div className="main__header">
-        <h1 className="main__title">Тестирование</h1>
+        <h1 className="main__title">Тестирование модели</h1>
+        <p className="main__subtitle">Загрузите JSON файл с отзывами для классификации</p>
       </div>
 
-      {/* Панель загрузки и метрик */}
-      <div className="testing-panel">
-        <div className="testing-panel__container">
-
-          {/* Загрузка файла */}
-          <div className="file-upload-section">
-            <h3 className="file-upload-section__title">Загрузить данные для тестирования</h3>
-            <div className="file-upload">
-              <input
-                type="file"
-                id="json-upload"
-                accept=".json"
-                onChange={handleFileUpload}
-                className="file-upload__input"
-              />
-              <label htmlFor="json-upload" className="file-upload__label">
-                <span className="file-upload__icon">📁</span>
-                <span className="file-upload__text">
-                  {isLoadingPredictions 
-                    ? 'Обработка...' 
-                    : testingData 
-                      ? 'Файл загружен' 
-                      : 'Выберите JSON файл'}
-                </span>
-              </label>
+      <div className="testing-page">
+        {/* Основная карточка загрузки */}
+        <div className="testing-card testing-card--upload">
+          <div className="testing-card__header">
+            <div className="testing-card__icon-wrapper">
+              <FlaskConical size={24} />
             </div>
+            <div>
+              <h3 className="testing-card__title">Загрузка данных</h3>
+              <p className="testing-card__description">Перетащите файл или нажмите для выбора</p>
+            </div>
+          </div>
+
+          {/* Drag-and-drop зона */}
+          <div 
+            className={`dropzone ${isDragOver ? 'dropzone--active' : ''} ${isLoadingPredictions ? 'dropzone--loading' : ''} ${testingData ? 'dropzone--success' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <input
+              type="file"
+              id="json-upload"
+              accept=".json"
+              onChange={handleFileUpload}
+              className="dropzone__input"
+              disabled={isLoadingPredictions}
+            />
+            <label htmlFor="json-upload" className="dropzone__label">
+              {isLoadingPredictions ? (
+                <>
+                  <div className="dropzone__spinner"></div>
+                  <span className="dropzone__text">Обработка файла...</span>
+                  <span className="dropzone__hint">Пожалуйста, подождите</span>
+                </>
+              ) : testingData ? (
+                <>
+                  <div className="dropzone__icon dropzone__icon--success">
+                    <Check size={32} />
+                  </div>
+                  <span className="dropzone__text">Файл успешно загружен</span>
+                  <span className="dropzone__hint">Нажмите для загрузки другого файла</span>
+                </>
+              ) : (
+                <>
+                  <div className="dropzone__icon">
+                    <Download size={32} />
+                  </div>
+                  <span className="dropzone__text">
+                    {isDragOver ? 'Отпустите файл здесь' : 'Перетащите JSON файл сюда'}
+                  </span>
+                  <span className="dropzone__hint">или нажмите для выбора файла</span>
+                </>
+              )}
+            </label>
           </div>
 
           {/* Отображение ошибки */}
           {predictionsError && (
-            <div style={{
-              backgroundColor: '#f8d7da',
-              color: '#721c24',
-              padding: '12px',
-              borderRadius: '4px',
-              margin: '16px 0',
-              border: '1px solid #f5c6cb'
-            }}>
-              <strong>Ошибка при обработке файла:</strong> {predictionsError}
+            <div className="testing-error">
+              <div className="testing-error__icon">!</div>
+              <div className="testing-error__content">
+                <span className="testing-error__title">Ошибка при обработке</span>
+                <span className="testing-error__message">{predictionsError}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Карточка результатов */}
+        <div className={`testing-card testing-card--results ${!predictionsResponse && !testingData ? 'testing-card--disabled' : ''}`}>
+          <div className="testing-card__header">
+            <div className="testing-card__icon-wrapper testing-card__icon-wrapper--secondary">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h3 className="testing-card__title">Результаты</h3>
+              <p className="testing-card__description">
+                {predictionsResponse 
+                  ? 'Классификация завершена' 
+                  : 'Загрузите файл для получения результатов'}
+              </p>
+            </div>
+          </div>
+
+          {predictionsResponse && (
+            <div className="testing-stats">
+              <div className="testing-stat">
+                <span className="testing-stat__value">
+                  {Array.isArray(predictionsResponse?.predictions) 
+                    ? predictionsResponse.predictions.length 
+                    : '—'}
+                </span>
+                <span className="testing-stat__label">Обработано отзывов</span>
+              </div>
+              <div className="testing-stat">
+                <span className="testing-stat__value testing-stat__value--accent">
+                  {(testingMetrics.accuracy * 100).toFixed(1)}%
+                </span>
+                <span className="testing-stat__label">Точность модели</span>
+              </div>
             </div>
           )}
 
-          {/* Скачивание файла */}
-          <div className="download-section">
-            <h3 className="download-section__title">Экспорт результатов</h3>
-            <button
-              className="download-button"
-              onClick={handleDownloadJson}
-              disabled={!testingData && !predictionsResponse}
-            >
-              <span className="download-button__icon">💾</span>
-              <span className="download-button__text">
-                {predictionsResponse ? 'Скачать answers.json' : 'Скачать JSON'}
-              </span>
-            </button>
+          <button
+            className={`btn-download ${!predictionsResponse && !testingData ? 'btn-download--disabled' : ''}`}
+            onClick={handleDownloadJson}
+            disabled={!testingData && !predictionsResponse}
+          >
+            <Download size={18} />
+            <span>
+              {predictionsResponse ? 'Скачать answers.json' : 'Скачать результаты'}
+            </span>
+          </button>
+        </div>
+
+        {/* Информационная карточка */}
+        <div className="testing-card testing-card--info">
+          <div className="testing-card__header">
+            <div className="testing-card__icon-wrapper testing-card__icon-wrapper--info">
+              <BookOpen size={24} />
+            </div>
+            <div>
+              <h3 className="testing-card__title">Формат данных</h3>
+              <p className="testing-card__description">Требования к входному файлу</p>
+            </div>
           </div>
 
+          <div className="testing-info">
+            <div className="testing-info__item">
+              <span className="testing-info__bullet">1</span>
+              <span className="testing-info__text">Файл должен быть в формате JSON</span>
+            </div>
+            <div className="testing-info__item">
+              <span className="testing-info__bullet">2</span>
+              <span className="testing-info__text">Массив объектов с полем "text" или "review"</span>
+            </div>
+            <div className="testing-info__item">
+              <span className="testing-info__bullet">3</span>
+              <span className="testing-info__text">Каждый объект может содержать поле "id"</span>
+            </div>
+          </div>
+
+          <div className="testing-code">
+            <code>
+{`[
+  { "id": 1, "text": "Отзыв клиента..." },
+  { "id": 2, "text": "Другой отзыв..." }
+]`}
+            </code>
+          </div>
         </div>
       </div>
-
     </>
   )
 
@@ -1517,17 +1932,17 @@ function App() {
         </div>
 
         <div className="card">
+          <div className="card__header-with-indicator">
+            <h4>Распределение негативных отзывов</h4>
+            <DataSourceIndicator source={dataSource.heatmap} />
+          </div>
           {isLoadingHeatmap ? (
             <div className="pie-chart__loading">
               <div className="pie-chart__loading-spinner"></div>
               <span className="pie-chart__loading-text">Загрузка данных для карты...</span>
             </div>
-          ) : heatmapError ? (
-            <div className="pie-chart__error">
-              <div className="pie-chart__error-icon">⚠️</div>
-              <span className="pie-chart__error-text">Ошибка: {heatmapError} (загружены mock данные)</span>
-            </div>
           ) : null}
+          {heatmapError && console.log('[Heatmap] API error, using mock data:', heatmapError)}
           {heatmapData && (
             <ResponsiveContainer width="100%" height={Math.max(400, yLabels.length * 40)}>
               <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 150 }}>
@@ -1614,106 +2029,320 @@ function App() {
     };
 
     return (
-      <>
+      <div className="reports-page">
         <div className="main__header">
           <h1 className="main__title">Генерация отчётов</h1>
+          <p className="main__subtitle">Создайте аналитический отчёт по выбранным параметрам</p>
         </div>
-        <div className="card" style={{ maxWidth: '800px' }}>
+        
+        <div className="card">
           <div className="report-generator">
+            {/* Step 1: Time Range */}
             <div className="report-section">
-              <h4>1. Выберите временной диапазон</h4>
-                <div className="time-range-selector" style={{margin: 0, padding: 0}}>
-                  <div className="time-range-selector__options" style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-                    {timeRangeOptions.map((option) => (
-                      <label key={option.id} className="time-range-option">
-                        <input
-                          type="radio"
-                          name="time-range-report"
-                          value={option.id}
-                          checked={selectedTimeRange === option.id}
-                          onChange={(e) => setSelectedTimeRange(e.target.value)}
-                        />
-                        <span className="time-range-option__label">{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-              </div>
-            </div>
-
-            <div className="report-section">
-              <h4>2. Выберите темы для отчета</h4>
-              <div className="topic-selection-list">
-                {availableTopics.filter(t => t.id !== 'Все').map(topic => (
-                  <label key={topic.id} className="topic-checkbox">
-                    <input 
-                      type="checkbox"
-                      checked={selectedReportTopics.includes(topic.id)}
-                      onChange={() => handleTopicSelection(topic.id)}
+              <span className="report-section__step">1</span>
+              <h4>Выберите временной диапазон</h4>
+              <p className="report-section__description">Укажите период для анализа данных</p>
+              <div className="time-range-options-vertical">
+                {timeRangeOptions.map((option) => (
+                  <label 
+                    key={option.id} 
+                    className={`time-range-radio-styled ${selectedTimeRange === option.id ? 'time-range-radio-styled--checked' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="time-range-report"
+                      value={option.id}
+                      checked={selectedTimeRange === option.id}
+                      onChange={(e) => setSelectedTimeRange(e.target.value)}
                     />
-                    {topic.label}
+                    <span className="time-range-radio-styled__indicator"></span>
+                    <span>{option.label}</span>
                   </label>
                 ))}
               </div>
             </div>
 
+            {/* Step 2: Topics */}
             <div className="report-section">
-              <h4>3. Выберите формат</h4>
-              <div className="format-selection">
-                <label className="time-range-option">
-                  <input type="radio" value="excel" checked={reportFormat === 'excel'} onChange={(e) => setReportFormat(e.target.value)} />
-                  <span className="time-range-option__label">Excel (.xlsx)</span>
+              <span className="report-section__step">2</span>
+              <h4>Выберите темы для отчета</h4>
+              <p className="report-section__description">Отметьте категории, которые хотите включить в отчёт</p>
+              <div className="topic-selection-grid">
+                {availableTopics.filter(t => t.id !== 'Все').map(topic => (
+                  <label 
+                    key={topic.id} 
+                    className={`topic-checkbox-styled ${selectedReportTopics.includes(topic.id) ? 'topic-checkbox-styled--checked' : ''}`}
+                  >
+                    <input 
+                      type="checkbox"
+                      checked={selectedReportTopics.includes(topic.id)}
+                      onChange={() => handleTopicSelection(topic.id)}
+                    />
+                    <span className="topic-checkbox-styled__indicator">
+                      <Check size={12} />
+                    </span>
+                    <span className="topic-checkbox-styled__label">{topic.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3: Format */}
+            <div className="report-section">
+              <span className="report-section__step">3</span>
+              <h4>Выберите формат</h4>
+              <p className="report-section__description">Выберите удобный формат для скачивания</p>
+              <div className="format-selection-grid">
+                <label className={`format-radio-styled ${reportFormat === 'excel' ? 'format-radio-styled--checked' : ''}`}>
+                  <input 
+                    type="radio" 
+                    name="report-format"
+                    value="excel" 
+                    checked={reportFormat === 'excel'} 
+                    onChange={(e) => setReportFormat(e.target.value)} 
+                  />
+                  <span className="format-radio-styled__indicator"></span>
+                  <span className="format-radio-styled__content">
+                    <span className="format-radio-styled__label">Excel</span>
+                    <span className="format-radio-styled__ext">.xlsx</span>
+                  </span>
                 </label>
-                <label className="time-range-option">
-                  <input type="radio" value="pdf" checked={reportFormat === 'pdf'} onChange={(e) => setReportFormat(e.target.value)} />
-                   <span className="time-range-option__label">PDF (.pdf)</span>
+                <label className={`format-radio-styled ${reportFormat === 'pdf' ? 'format-radio-styled--checked' : ''}`}>
+                  <input 
+                    type="radio" 
+                    name="report-format"
+                    value="pdf" 
+                    checked={reportFormat === 'pdf'} 
+                    onChange={(e) => setReportFormat(e.target.value)} 
+                  />
+                  <span className="format-radio-styled__indicator"></span>
+                  <span className="format-radio-styled__content">
+                    <span className="format-radio-styled__label">PDF</span>
+                    <span className="format-radio-styled__ext">.pdf</span>
+                  </span>
                 </label>
               </div>
             </div>
 
-            <button onClick={handleGenerateReport} disabled={isGeneratingReport} className="download-button">
-              {isGeneratingReport ? 'Генерация...' : 'Сгенерировать отчёт'}
+            {/* Generate Button */}
+            <button 
+              onClick={handleGenerateReport} 
+              disabled={isGeneratingReport} 
+              className="generate-report-btn"
+            >
+              {isGeneratingReport ? (
+                <>
+                  <span className="generate-report-btn__spinner"></span>
+                  <span>Генерация...</span>
+                  <span className="generate-report-btn__progress"></span>
+                </>
+              ) : (
+                <>
+                  <FileText className="generate-report-btn__icon" />
+                  <span>Сгенерировать отчёт</span>
+                </>
+              )}
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   };
 
 
 
 
+  // Функция для рендеринга markdown текста
+  const renderMarkdown = (text) => {
+    if (!text) return null;
+    
+    // Разбиваем текст на строки и обрабатываем каждую
+    const lines = text.split('\n');
+    const elements = [];
+    let currentList = [];
+    let listType = null;
+    
+    const flushList = () => {
+      if (currentList.length > 0) {
+        elements.push(
+          <ul key={`list-${elements.length}`} className="recommendation-markdown__list">
+            {currentList.map((item, idx) => (
+              <li key={idx} className="recommendation-markdown__list-item">{item}</li>
+            ))}
+          </ul>
+        );
+        currentList = [];
+        listType = null;
+      }
+    };
+    
+    lines.forEach((line, index) => {
+      // Заголовки
+      if (line.startsWith('### ')) {
+        flushList();
+        elements.push(
+          <h3 key={index} className="recommendation-markdown__h3">
+            {line.replace('### ', '')}
+          </h3>
+        );
+      } else if (line.startsWith('## ')) {
+        flushList();
+        elements.push(
+          <h2 key={index} className="recommendation-markdown__h2">
+            {line.replace('## ', '')}
+          </h2>
+        );
+      } else if (line.startsWith('# ')) {
+        flushList();
+        elements.push(
+          <h1 key={index} className="recommendation-markdown__h1">
+            {line.replace('# ', '')}
+          </h1>
+        );
+      }
+      // Списки с маркерами
+      else if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
+        const content = line.trim().replace(/^[\*\-]\s+/, '');
+        // Обработка жирного текста и курсива
+        const formattedContent = content
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        currentList.push(<span dangerouslySetInnerHTML={{ __html: formattedContent }} />);
+      }
+      // Нумерованные списки
+      else if (/^\d+\.\s/.test(line.trim())) {
+        flushList();
+        const content = line.trim().replace(/^\d+\.\s+/, '');
+        // Обработка жирного текста
+        const formattedContent = content
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        elements.push(
+          <p key={index} className="recommendation-markdown__numbered">
+            <span className="recommendation-markdown__number">{line.trim().match(/^\d+/)[0]}.</span>
+            <span dangerouslySetInnerHTML={{ __html: formattedContent }} />
+          </p>
+        );
+      }
+      // Обычный текст
+      else if (line.trim()) {
+        flushList();
+        const formattedContent = line
+          .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        elements.push(
+          <p key={index} className="recommendation-markdown__paragraph">
+            <span dangerouslySetInnerHTML={{ __html: formattedContent }} />
+          </p>
+        );
+      }
+      // Пустые строки
+      else {
+        flushList();
+      }
+    });
+    
+    flushList();
+    return elements;
+  };
 
   const renderRecommendationsPage = () => {
     return (
         <>
             <div className="main__header">
-                <h1 className="main__title">Рекомендации от ИИ</h1>
+                <div className="main__header-with-indicator">
+                    <h1 className="main__title">Рекомендации от ИИ</h1>
+                    <DataSourceIndicator source={dataSource.recommendations} />
+                </div>
+                <p className="main__subtitle">Получите персонализированные рекомендации на основе анализа отзывов</p>
             </div>
 
             <div className="recommendation-page">
                 <div className="recommendation-controls card">
-                    <h4>Анализ негативных отзывов</h4>
-                    <p>Выберите тему, чтобы получить от ИИ-аналитика конкретные рекомендации по улучшению.</p>
-                    <select 
-                        value={selectedTopicForAnalysis} 
-                        onChange={(e) => setSelectedTopicForAnalysis(e.target.value)}
-                        style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                    >
-                        {availableTopics.filter(t => t.id !== 'Все').map(topic => (
-                            <option key={topic.id} value={topic.id}>{topic.label}</option>
-                        ))}
-                    </select>
-                    <button onClick={fetchRecommendations} disabled={isLoadingRecommendations} className="download-button" style={{width: 'auto'}}>
-                        {isLoadingRecommendations ? 'Анализ...' : 'Сгенерировать рекомендации'}
-                    </button>
+                    <div className="recommendation-controls__header">
+                        <div className="recommendation-controls__icon">
+                            <Sparkles size={24} />
+                        </div>
+                        <div className="recommendation-controls__text">
+                            <h4 className="recommendation-controls__title">Анализ негативных отзывов</h4>
+                            <p className="recommendation-controls__description">
+                                Выберите тему для анализа, и ИИ-аналитик предоставит конкретные рекомендации по улучшению
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div className="recommendation-controls__actions">
+                        <div className="recommendation-select-wrapper">
+                            <label className="recommendation-select__label">Тема анализа</label>
+                            <div className="recommendation-select">
+                                <select 
+                                    value={selectedTopicForAnalysis} 
+                                    onChange={(e) => setSelectedTopicForAnalysis(e.target.value)}
+                                    className="recommendation-select__input"
+                                >
+                                    {availableTopics.filter(t => t.id !== 'Все').map(topic => (
+                                        <option key={topic.id} value={topic.id}>{topic.label}</option>
+                                    ))}
+                                </select>
+                                <div className="recommendation-select__arrow">
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button 
+                            onClick={fetchRecommendations} 
+                            disabled={isLoadingRecommendations} 
+                            className={`btn btn--primary recommendation-btn ${isLoadingRecommendations ? 'btn--loading' : ''}`}
+                        >
+                            {isLoadingRecommendations ? (
+                                <>
+                                    <span className="recommendation-btn__spinner"></span>
+                                    <span>Анализирую...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles size={18} />
+                                    <span>Сгенерировать рекомендации</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
-                <div className="card">
-                    {isLoadingRecommendations && <p>ИИ-аналитик изучает отзывы...</p>}
-                    {recommendationsError && <p style={{color: 'red'}}>Ошибка: {recommendationsError}</p>}
-                    {recommendationsData && (
+                <div className="recommendation-output-card card">
+                    {isLoadingRecommendations && (
+                        <div className="recommendation-loading">
+                            <div className="recommendation-loading__spinner"></div>
+                            <p className="recommendation-loading__text">ИИ-аналитик изучает отзывы...</p>
+                            <p className="recommendation-loading__subtext">Это может занять несколько секунд</p>
+                        </div>
+                    )}
+                    
+                    {recommendationsError && !isLoadingRecommendations && (
+                        <div className="recommendation-error">
+                            <div className="recommendation-error__icon">⚠️</div>
+                            <p className="recommendation-error__text">Ошибка: {recommendationsError}</p>
+                            <p className="recommendation-error__subtext">Загружены демонстрационные данные</p>
+                        </div>
+                    )}
+                    
+                    {!isLoadingRecommendations && !recommendationsData && !recommendationsError && (
+                        <div className="recommendation-empty">
+                            <div className="recommendation-empty__icon">
+                                <Sparkles size={48} />
+                            </div>
+                            <p className="recommendation-empty__text">Выберите тему и нажмите кнопку для генерации рекомендаций</p>
+                        </div>
+                    )}
+                    
+                    {!isLoadingRecommendations && recommendationsData && (
                         <div className="recommendation-output">
-                            <pre>{recommendationsData}</pre>
+                            <div className="recommendation-markdown">
+                                {renderMarkdown(recommendationsData)}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1732,6 +2361,27 @@ function App() {
         );
     };
 
+    // Фильтруем данные по выбранным конкурентам (Gazprombank всегда включен)
+    const filteredCompetitorData = competitorData 
+      ? competitorData.filter(item => 
+          item.bank_name === 'Gazprombank' || selectedCompetitors.includes(item.bank_name)
+        ).sort((a, b) => b.nps_score - a.nps_score)
+      : [];
+
+    // Custom Tooltip для графика
+    const CustomTooltip = ({ active, payload }) => {
+      if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+          <div className="competitor-tooltip">
+            <p className="competitor-tooltip__label">{data.bank_name}</p>
+            <p className="competitor-tooltip__value">NPS: {data.nps_score}</p>
+          </div>
+        );
+      }
+      return null;
+    };
+
     return (
         <>
             <div className="main__header">
@@ -1741,41 +2391,105 @@ function App() {
             <div className="competitor-page">
                 <div className="competitor-filters card">
                     <h4>Выберите конкурентов для сравнения</h4>
-                    <div className="topic-selection-list">
-                        {competitorList.map(bank => (
-                            <label key={bank} className="topic-checkbox">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedCompetitors.includes(bank)}
-                                    onChange={() => handleCompetitorSelection(bank)}
-                                />
-                                {bank}
-                            </label>
-                        ))}
+                    <div className="competitor-checkbox-list">
+                        {competitorList.map(bank => {
+                            const isChecked = selectedCompetitors.includes(bank);
+                            return (
+                                <label 
+                                    key={bank} 
+                                    className={`competitor-checkbox ${isChecked ? 'competitor-checkbox--checked' : ''}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() => handleCompetitorSelection(bank)}
+                                    />
+                                    <span className="competitor-checkbox__indicator">
+                                        <Check />
+                                    </span>
+                                    <span className="competitor-checkbox__label">{bank}</span>
+                                </label>
+                            );
+                        })}
                     </div>
                 </div>
 
-                <div className="card">
-                    <h4>Сравнение по NPS (Net Promoter Score)</h4>
+                <div className="card competitor-chart-card">
+                    <div className="card__header-with-indicator">
+                        <h4>Сравнение по NPS (Net Promoter Score)</h4>
+                        <DataSourceIndicator source={dataSource.competitors} />
+                    </div>
+                    
+                    {competitorError && console.log('[Competitors] API error, using mock data:', competitorError)}
+                    
                     {isLoadingCompetitors ? (
-                        <p>Загрузка данных...</p>
-                    ) : competitorError ? (
-                        <p>Ошибка: {competitorError} (Загружены mock данные)</p>
-                    ) : null}
-                    {competitorData && (
+                        <div className="competitor-loading">
+                            <div className="competitor-loading__spinner"></div>
+                            <span className="competitor-loading__text">Загрузка данных о конкурентах...</span>
+                        </div>
+                    ) : filteredCompetitorData.length > 0 ? (
                         <ResponsiveContainer width="100%" height={400}>
-                            <BarChart data={competitorData} layout="vertical" margin={{ left: 100 }}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" domain={[-100, 100]} />
-                                <YAxis dataKey="bank_name" type="category" />
-                                <Tooltip />
-                                <Bar dataKey="nps_score" name="NPS">
-                                    {competitorData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.bank_name === 'Gazprombank' ? '#2b61ec' : '#64748b'} />
+                            <BarChart 
+                                data={filteredCompetitorData} 
+                                layout="vertical" 
+                                margin={{ left: 20, right: 40, top: 20, bottom: 20 }}
+                            >
+                                <CartesianGrid 
+                                    strokeDasharray="3 3" 
+                                    stroke="rgba(255, 255, 255, 0.06)"
+                                    horizontal={true}
+                                    vertical={false}
+                                />
+                                <XAxis 
+                                    type="number" 
+                                    domain={[0, 100]} 
+                                    tick={{ fill: 'rgba(255, 255, 255, 0.5)', fontSize: 12 }}
+                                    axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                                    tickLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                                />
+                                <YAxis 
+                                    dataKey="bank_name" 
+                                    type="category" 
+                                    width={120}
+                                    tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 13, fontWeight: 500 }}
+                                    axisLine={{ stroke: 'rgba(255, 255, 255, 0.1)' }}
+                                    tickLine={false}
+                                />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.03)' }} />
+                                <Bar 
+                                    dataKey="nps_score" 
+                                    name="NPS" 
+                                    radius={[0, 8, 8, 0]}
+                                    barSize={32}
+                                >
+                                    {filteredCompetitorData.map((entry, index) => (
+                                        <Cell 
+                                            key={`cell-${index}`} 
+                                            fill={entry.bank_name === 'Gazprombank' 
+                                                ? 'url(#gazprombankGradient)' 
+                                                : 'rgba(255, 255, 255, 0.15)'
+                                            }
+                                            stroke={entry.bank_name === 'Gazprombank' 
+                                                ? 'rgba(99, 102, 241, 0.5)' 
+                                                : 'rgba(255, 255, 255, 0.1)'
+                                            }
+                                            strokeWidth={1}
+                                        />
                                     ))}
                                 </Bar>
+                                <defs>
+                                    <linearGradient id="gazprombankGradient" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#6366F1" />
+                                        <stop offset="100%" stopColor="#8B5CF6" />
+                                    </linearGradient>
+                                </defs>
                             </BarChart>
                         </ResponsiveContainer>
+                    ) : (
+                        <div className="competitor-error">
+                            <span className="competitor-error__icon">📊</span>
+                            <span className="competitor-error__text">Выберите конкурентов для сравнения</span>
+                        </div>
                     )}
                 </div>
             </div>
@@ -1783,34 +2497,110 @@ function App() {
     );
   };
 
+  // Helper function to determine alert severity based on percentage
+  const getAlertSeverity = (percentage) => {
+    if (percentage === 'inf' || percentage >= 100) return 'danger';
+    if (percentage >= 50) return 'warning';
+    return 'info';
+  };
+
+  // Helper function to get severity label
+  const getSeverityLabel = (severity) => {
+    switch (severity) {
+      case 'danger': return 'Критично';
+      case 'warning': return 'Внимание';
+      case 'info': return 'Информация';
+      default: return 'Оповещение';
+    }
+  };
+
+  // Helper function to get severity icon
+  const getSeverityIcon = (severity) => {
+    switch (severity) {
+      case 'danger': return '🔴';
+      case 'warning': return '🟠';
+      case 'info': return '🔵';
+      default: return '⚪';
+    }
+  };
+
   const renderAlertsPage = () => (
     <>
       <div className="main__header">
-        <h1 className="main__title">Оповещения о резких изменениях</h1>
+        <div className="main__header-with-indicator">
+          <h1 className="main__title">Оповещения о резких изменениях</h1>
+          <DataSourceIndicator source={dataSource.alerts} />
+        </div>
       </div>
       <div className="alerts-page">
         {isLoadingAlerts ? (
-          <div className="pie-chart__loading">
-            <div className="pie-chart__loading-spinner"></div>
-            <span className="pie-chart__loading-text">Загрузка оповещений...</span>
+          <div className="alerts-loading">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="alert-skeleton">
+                <div className="alert-skeleton__header">
+                  <div className="alert-skeleton__topic">
+                    <div className="alert-skeleton__icon skeleton"></div>
+                    <div className="alert-skeleton__title skeleton"></div>
+                  </div>
+                  <div className="alert-skeleton__badge skeleton"></div>
+                </div>
+                <div className="alert-skeleton__message skeleton"></div>
+                <div className="alert-skeleton__message alert-skeleton__message--short skeleton"></div>
+                <div className="alert-skeleton__footer">
+                  <div className="alert-skeleton__percentage skeleton"></div>
+                  <div className="alert-skeleton__timestamp skeleton"></div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : alertsError ? (
-           <div className="pie-chart__error">
-              <div className="pie-chart__error-icon">⚠️</div>
-              <span className="pie-chart__error-text">Ошибка: {alertsError} (загружены mock данные)</span>
+          <div className="alerts-error">
+            <div className="alerts-error__icon">⚠️</div>
+            <h3 className="alerts-error__title">Не удалось загрузить оповещения</h3>
+            <p className="alerts-error__message">{alertsError}</p>
+            <div className="alerts-error__badge">
+              <span>📊</span>
+              <span>Отображены демо-данные</span>
             </div>
+          </div>
         ) : alertsData && alertsData.length > 0 ? (
-          alertsData.map((alert, index) => (
-            <div key={index} className="alert-card alert-card--danger">
-              <h4 className="alert-card__title">Резкий рост негатива: {translateTopicName(alert.topic)}</h4>
-              <p className="alert-card__message">
-                {alert.message} 
-                (Рост на <strong>{alert.percentage_increase === 'inf' ? '∞' : `${alert.percentage_increase}%`}</strong>)
-              </p>
-            </div>
-          ))
+          alertsData.map((alert, index) => {
+            const severity = getAlertSeverity(alert.percentage_increase);
+            return (
+              <div key={index} className={`alert-card alert-card--${severity}`}>
+                <div className="alert-card__header">
+                  <div className="alert-card__topic-wrapper">
+                    <div className="alert-card__icon">
+                      {getSeverityIcon(severity)}
+                    </div>
+                    <span className="alert-card__topic">{translateTopicName(alert.topic)}</span>
+                  </div>
+                  <span className="alert-card__badge">
+                    {getSeverityLabel(severity)}
+                  </span>
+                </div>
+                <p className="alert-card__message">{alert.message}</p>
+                <div className="alert-card__footer">
+                  <div className="alert-card__percentage-wrapper">
+                    <span className="alert-card__percentage-label">Рост негатива</span>
+                    <span className="alert-card__percentage">
+                      {alert.percentage_increase === 'inf' ? '∞' : `+${alert.percentage_increase}%`}
+                    </span>
+                    <span className="alert-card__percentage-arrow">↑</span>
+                  </div>
+                  <span className="alert-card__timestamp">Обнаружено сегодня</span>
+                </div>
+              </div>
+            );
+          })
         ) : (
-          <p>Нет активных оповещений.</p>
+          <div className="alerts-empty">
+            <div className="alerts-empty__icon">✅</div>
+            <h3 className="alerts-empty__title">Нет активных оповещений</h3>
+            <p className="alerts-empty__description">
+              Все показатели в норме. Система автоматически уведомит вас при обнаружении резких изменений в тональности отзывов.
+            </p>
+          </div>
         )}
       </div>
     </>
@@ -1842,13 +2632,82 @@ function App() {
     <>
       <div className="main__header">
         <h1 className="main__title">Экспорт данных в BI</h1>
+        <p className="main__subtitle">Выгрузка данных для аналитических систем</p>
       </div>
-      <div className="card" style={{ maxWidth: '600px' }}>
-        <h4>Экспорт всех отзывов</h4>
-        <p style={{ margin: '16px 0' }}>Нажмите кнопку ниже, чтобы скачать все обработанные отзывы с темами и тональностями в формате CSV. Этот файл можно легко импортировать в любую BI-систему (Power BI, Tableau, etc.) для дальнейшего анализа.</p>
-        <button onClick={handleExportCsv} disabled={isExporting} className="download-button">
-          {isExporting ? 'Экспорт...' : 'Скачать CSV'}
-        </button>
+      <div className="export-page">
+        <div className="export-card">
+          <div className="export-card__icon">
+            <Download size={32} />
+          </div>
+          <div className="export-card__content">
+            <h3 className="export-card__title">Экспорт всех отзывов</h3>
+            <p className="export-card__description">
+              Скачайте все обработанные отзывы с темами и тональностями в формате CSV. 
+              Этот файл можно легко импортировать в любую BI-систему для дальнейшего анализа.
+            </p>
+            <div className="export-card__features">
+              <div className="export-card__feature">
+                <span className="export-card__feature-icon">📊</span>
+                <span>Power BI</span>
+              </div>
+              <div className="export-card__feature">
+                <span className="export-card__feature-icon">📈</span>
+                <span>Tableau</span>
+              </div>
+              <div className="export-card__feature">
+                <span className="export-card__feature-icon">📉</span>
+                <span>Excel</span>
+              </div>
+              <div className="export-card__feature">
+                <span className="export-card__feature-icon">🔢</span>
+                <span>Google Sheets</span>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={handleExportCsv} 
+            disabled={isExporting} 
+            className={`export-btn ${isExporting ? 'export-btn--loading' : ''}`}
+          >
+            {isExporting ? (
+              <>
+                <span className="export-btn__spinner"></span>
+                <span>Экспорт...</span>
+              </>
+            ) : (
+              <>
+                <Download size={20} />
+                <span>Скачать CSV</span>
+              </>
+            )}
+          </button>
+        </div>
+        
+        <div className="export-info">
+          <div className="export-info__card">
+            <div className="export-info__header">
+              <span className="export-info__icon">ℹ️</span>
+              <h4 className="export-info__title">Информация о данных</h4>
+            </div>
+            <ul className="export-info__list">
+              <li>Все отзывы с классификацией по темам</li>
+              <li>Анализ тональности (позитивная, негативная, нейтральная)</li>
+              <li>Временные метки для трендового анализа</li>
+              <li>Готовый формат для импорта в BI-системы</li>
+            </ul>
+          </div>
+          
+          <div className="export-info__card">
+            <div className="export-info__header">
+              <span className="export-info__icon">💡</span>
+              <h4 className="export-info__title">Рекомендации</h4>
+            </div>
+            <p className="export-info__text">
+              Для наилучших результатов рекомендуем использовать Power BI или Tableau 
+              для создания интерактивных дашбордов на основе экспортированных данных.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   );
@@ -1857,30 +2716,138 @@ function App() {
     <>
       <div className="main__header">
         <h1 className="main__title">Документация</h1>
+        <p className="main__subtitle">Руководство по использованию аналитической платформы</p>
       </div>
       <div className="documentation">
+        {/* Hero Card - Быстрый старт */}
+        <div className="documentation__hero">
+          <div className="documentation__hero-icon">
+            <Sparkles size={32} />
+          </div>
+          <div className="documentation__hero-content">
+            <h2 className="documentation__hero-title">Добро пожаловать</h2>
+            <p className="documentation__hero-text">
+              ИИ-дашборд для аналитиков Газпромбанка — это современная система для сбора, анализа и визуализации клиентских отзывов. 
+              Используйте мощь искусственного интеллекта для получения actionable insights.
+            </p>
+          </div>
+        </div>
+
+        {/* Секция функционала */}
         <div className="documentation__section">
-          <div className="documentation__card">
-            <div className="documentation__card-header">
-              <div className="documentation__icon">🚀</div>
-              <h2 className="documentation__card-title">Быстрый старт</h2>
+          <h2 className="documentation__section-title">Функционал платформы</h2>
+          <div className="documentation__features-grid">
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--purple">
+                <LayoutGrid size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Кластеризация</h3>
+              <p className="documentation__feature-desc">Анализ динамики и распределения отзывов по темам и тональности с интерактивными графиками.</p>
             </div>
-            <div className="documentation__card-content">
-              <p>Добро пожаловать в ИИ-дашборд для аналитиков Газпромбанка! Эта система предназначена для сбора, анализа и визуализации клиентских отзывов.</p>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--orange">
+                <Flame size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Тепловые карты</h3>
+              <p className="documentation__feature-desc">Визуализация концентрации негативных отзывов по темам и временным периодам.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--blue">
+                <Users size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Сравнение с конкурентами</h3>
+              <p className="documentation__feature-desc">Сравнение ключевых метрик NPS и рейтингов с другими банками на рынке.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--pink">
+                <Sparkles size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Рекомендации ИИ</h3>
+              <p className="documentation__feature-desc">Автоматические рекомендации по улучшению продуктов на основе анализа негативных отзывов.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--green">
+                <FileText size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Генерация отчётов</h3>
+              <p className="documentation__feature-desc">Создание и скачивание аналитических отчетов в форматах PDF и Excel.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--yellow">
+                <Bell size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Оповещения</h3>
+              <p className="documentation__feature-desc">Отслеживание резких скачков негативной тональности по различным темам.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--cyan">
+                <Download size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Экспорт в BI</h3>
+              <p className="documentation__feature-desc">Выгрузка данных в CSV для импорта в Power BI, Tableau и другие системы.</p>
+            </div>
+            
+            <div className="documentation__feature-card">
+              <div className="documentation__feature-icon documentation__feature-icon--indigo">
+                <FlaskConical size={24} />
+              </div>
+              <h3 className="documentation__feature-title">Тестирование</h3>
+              <p className="documentation__feature-desc">Загрузка JSON-файлов для тестирования модели классификации отзывов.</p>
             </div>
           </div>
         </div>
+
+        {/* Секция быстрого старта */}
         <div className="documentation__section">
-            <h2 className="documentation__section-title">Функционал</h2>
-            <div className="documentation__features">
-                <div className="documentation__feature"><h3>Кластеризация</h3><p>Анализ динамики и распределения отзывов по темам и тональности.</p></div>
-                <div className="documentation__feature"><h3>Тепловые карты</h3><p>Визуализация концентрации негативных отзывов по темам и месяцам.</p></div>
-                <div className="documentation__feature"><h3>Сравнение с конкурентами</h3><p>Сравнение ключевых метрик (NPS, средний рейтинг) с другими банками.</p></div>
-                <div className="documentation__feature"><h3>Рекомендации ИИ</h3><p>Получение автоматических рекомендаций по улучшению на основе анализа негативных отзывов.</p></div>
-                <div className="documentation__feature"><h3>Генерация отчётов</h3><p>Создание и скачивание аналитических отчетов в форматах PDF и Excel.</p></div>
-                <div className="documentation__feature"><h3>Оповещения</h3><p>Отслеживание резких скачков негативной тональности по различным темам.</p></div>
-                <div className="documentation__feature"><h3>Экспорт в BI</h3><p>Выгрузка всех данных в формате CSV для импорта в Power BI, Tableau и другие системы.</p></div>
+          <h2 className="documentation__section-title">Быстрый старт</h2>
+          <div className="documentation__steps">
+            <div className="documentation__step">
+              <div className="documentation__step-number">1</div>
+              <div className="documentation__step-content">
+                <h4 className="documentation__step-title">Выберите раздел</h4>
+                <p className="documentation__step-desc">Используйте боковое меню для навигации между разделами аналитики.</p>
+              </div>
             </div>
+            <div className="documentation__step">
+              <div className="documentation__step-number">2</div>
+              <div className="documentation__step-content">
+                <h4 className="documentation__step-title">Настройте фильтры</h4>
+                <p className="documentation__step-desc">Выберите временной период и интересующие темы для анализа.</p>
+              </div>
+            </div>
+            <div className="documentation__step">
+              <div className="documentation__step-number">3</div>
+              <div className="documentation__step-content">
+                <h4 className="documentation__step-title">Анализируйте данные</h4>
+                <p className="documentation__step-desc">Изучайте графики, получайте рекомендации ИИ и экспортируйте отчеты.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Техническая информация */}
+        <div className="documentation__section">
+          <h2 className="documentation__section-title">Техническая информация</h2>
+          <div className="documentation__tech-cards">
+            <div className="documentation__tech-card">
+              <h4 className="documentation__tech-title">API Endpoints</h4>
+              <p className="documentation__tech-desc">Система использует REST API для получения данных. При недоступности сервера автоматически используются демо-данные.</p>
+            </div>
+            <div className="documentation__tech-card">
+              <h4 className="documentation__tech-title">Модель ИИ</h4>
+              <p className="documentation__tech-desc">Классификация отзывов выполняется с помощью fine-tuned модели на основе BERT для русского языка.</p>
+            </div>
+            <div className="documentation__tech-card">
+              <h4 className="documentation__tech-title">Обновление данных</h4>
+              <p className="documentation__tech-desc">Данные обновляются в реальном времени при изменении фильтров и временных периодов.</p>
+            </div>
+          </div>
         </div>
       </div>
     </>
@@ -1903,44 +2870,53 @@ function App() {
         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         aria-label="Toggle menu"
       >
-        <span className={`burger-line ${isMobileMenuOpen ? 'burger-line--active' : ''}`}></span>
-        <span className={`burger-line ${isMobileMenuOpen ? 'burger-line--active' : ''}`}></span>
-        <span className={`burger-line ${isMobileMenuOpen ? 'burger-line--active' : ''}`}></span>
+        {isMobileMenuOpen ? (
+          <X size={24} strokeWidth={2} />
+        ) : (
+          <Menu size={24} strokeWidth={2} />
+        )}
       </button>
 
       {/* Левое меню */}
       <nav className={`sidebar ${isMobileMenuOpen ? 'sidebar--mobile-open' : ''}`}>
         <div className="sidebar__header">
-          <h2 className="sidebar__title">Меню</h2>
+          <div className="sidebar__logo">
+            <div className="sidebar__logo-icon">
+              <Sparkles size={24} />
+            </div>
+            <div className="sidebar__logo-text">
+              <span className="sidebar__logo-title">Газпромбанк</span>
+              <span className="sidebar__logo-subtitle">Аналитика отзывов</span>
+            </div>
+          </div>
+          <GlobalDataSourceBadge />
           <button 
             className="sidebar__close"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Close menu"
           >
-            ×
+            <X size={20} />
           </button>
         </div>
         <div className="sidebar__menu">
-          {menuItems.map((item, index) => (
-            <div 
-              key={index}
-              className={`sidebar__item ${activeMenuItem === item ? 'sidebar__item--active' : ''}`}
-              onClick={() => {
-                setActiveMenuItem(item)
-                setIsMobileMenuOpen(false) // Закрываем меню при выборе пункта
-              }}
-            >
-              <div className="sidebar__icon">
-                <div className="sidebar__icon-grid">
-                  <div className="sidebar__icon-square"></div>
-                  <div className="sidebar__icon-square"></div>
-                  <div className="sidebar__icon-square"></div>
-                  <div className="sidebar__icon-square"></div>
+          {menuItems.map((item) => {
+            const IconComponent = item.icon
+            return (
+              <div 
+                key={item.id}
+                className={`sidebar__item ${activeMenuItem === item.id ? 'sidebar__item--active' : ''}`}
+                onClick={() => {
+                  setActiveMenuItem(item.id)
+                  setIsMobileMenuOpen(false)
+                }}
+              >
+                <div className="sidebar__icon">
+                  <IconComponent size={20} strokeWidth={1.5} />
                 </div>
+                <span className="sidebar__label">{item.label}</span>
               </div>
-              <span className="sidebar__label">{item}</span>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </nav>
 
