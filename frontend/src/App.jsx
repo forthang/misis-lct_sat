@@ -13,7 +13,8 @@ import {
   BookOpen,
   Menu,
   X,
-  Check
+  Check,
+  BarChart3
 } from 'lucide-react'
 
 function App() {
@@ -2918,10 +2919,10 @@ function App() {
         <div className="sidebar__header">
           <div className="sidebar__logo">
             <div className="sidebar__logo-icon">
-              <Sparkles size={24} />
+              <BarChart3 size={24} />
             </div>
             <div className="sidebar__logo-text">
-              <span className="sidebar__logo-title">Газпромбанк</span>
+              <span className="sidebar__logo-title">Dastats</span>
               <span className="sidebar__logo-subtitle">Аналитика отзывов</span>
             </div>
           </div>

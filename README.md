@@ -4,7 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-24.0-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com/)
-[![LangChain](https://img.shields.io/badge/LangChain-0.1.0-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white)](https://langchain.com/)
+[![GigaChat](https://img.shields.io/badge/GigaChat-AI-FF6B35?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K&logoColor=white)](https://developers.sber.ru/portal/products/gigachat)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
 
 ![Demo](https://img.shields.io/badge/Live_Demo-Available-success?style=for-the-badge)
@@ -44,7 +44,7 @@
 
 Фронтенд написан на **React**, бэкенд на **Python (FastAPI)**, база данных — **PostgreSQL с использованием SQLAlchemy + asyncpg**. В систему загружено **25 000 исторических отзывов**, предварительно спаршенных с источников.
 
-Ссылка на дашборд: https://lct.misis-team.ru
+Ссылка на дашборд: https://forthang.github.io/misis-lct_sat/
 
 Endpoint для predict доступен по https://lct.misis-team.ru:8000/api/predict
 
@@ -67,7 +67,7 @@ graph LR
 
     subgraph AI Агент
         E[LangChain + LangGraph]:::ai
-        F[LLM GPT-OSS-20B через OpenRouter API]:::model
+        F[GigaChat API]:::model
     end
 
     A1 -->|Парсер| B
@@ -93,7 +93,7 @@ graph LR
 
 ## 🧠 Используемые методы
 
-- **Классификация категорий отзывов**: AI-агент на базе **LangChain + LangGraph**, модель **GPT-OSS-20B** (предобученная, без дообучения).
+- **Классификация категорий отзывов**: AI-агент на базе **LangChain + LangGraph**, модель **GigaChat** от Сбера.
 - **Классификация тональностей**: тот же агент с отдельным промптом.
 - **Метрики качества**:
   - *F1-micro* для классификации категорий.
@@ -114,7 +114,7 @@ graph LR
 
 ### Требования
 - Установленный **Docker** и **Docker Compose**
-- Для успешного запуска нужно получить нужный ключ доступа от Openrouter и поместить их в .env
+- Для успешного запуска нужно получить ключ доступа от GigaChat и поместить его в .env
 
 ### Команды запуска
 ```bash
@@ -147,7 +147,7 @@ http://localhost:5173/api/predict
 - **Frontend**: React
 - **Design**: Figma
 - **Database**: PostgreSQL (SQLAlchemy + asyncpg)
-- **ML/LLM**: GPT-OSS-20B через OpenRouter API
+- **ML/LLM**: GigaChat API от Сбера
 - **Инфраструктура**: Docker, Docker Compose
 
 ---
