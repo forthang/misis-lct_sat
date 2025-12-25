@@ -13,6 +13,7 @@ from api.core.db.review_crud import (
     get_topics_comparison,
     get_heatmap_data,
     get_sentiment_alerts,
+    get_topics_negative_stats,
 )
 from api.core.schemas import (
     ReviewSchema,
@@ -274,16 +275,25 @@ async def get_alerts(
     session: AsyncSession = Depends(get_async_session),
 ) -> Dict[str, Any]:
     """
-    Выявляет и возвращает резкие скачки негативной тональности.
+    Выявляет проблемы и возвращает алерты с решениями.
     """
     try:
-        alerts = await get_sentiment_alerts(session=session)
+        from api.core.agent.agents import detect_alerts
+        
+        # Получаем статистику негативных отзывов
+        topics_data = await get_topics_negative_stats(
+            session=session,
+            start_date=datetime(2024, 1, 1),
+            end_date=datetime.now(),
+        )
+        
+        # Формируем алерты с проблемами и решениями
+        alerts = await detect_alerts(topics_data)
+        
         return {
             "status": "success",
             "data": alerts,
-            "meta": {
-                "count": len(alerts)
-            },
+            "meta": {"count": len(alerts)},
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

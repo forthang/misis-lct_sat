@@ -17,8 +17,13 @@ class Settings(BaseSettings):
 
     PROJECT_NAME: str = "Review Analysis API"
 
+    # GigaChat
+    GIGACHAT_CREDENTIALS: str = ""
+    GIGACHAT_MODEL: str = "GigaChat"
+    
+    # Legacy (Google)
     LLM_NAME: str = "models/gemma-3-27b-it"
-    GOOGLE_API_KEY: str
+    GOOGLE_API_KEY: str = ""
 
     BATCH_SIZE: int = 15
     MAX_CONCURRENT_REQUESTS: int = 10
@@ -35,6 +40,3 @@ settings = Settings()
 
 
 DATABASE_URL = f'postgresql+asyncpg://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
-ALEBMIC_URL = f'postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}'
-DATE_FORMAT = '%m/%d/%Y %H:%M UTC' #%m/%d/%Y - 
-# '6/29/2011 4:52:48 AM UTC'

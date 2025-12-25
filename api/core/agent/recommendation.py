@@ -1,14 +1,16 @@
 from api.core.agent.prompts import GENERATE_RECOMMENDATIONS_PROMPT
 from api.core.agent.utils import llm
 
+
 async def get_recommendations_for_reviews(topic: str, reviews: list[str]) -> str:
-    """
-    Генерирует рекомендации на основе списка негативных отзывов.
-    """
+    """Генерирует рекомендации на основе списка негативных отзывов."""
     if not reviews:
         return "Недостаточно данных для генерации рекомендаций."
 
-    formatted_reviews = "\n\n---\n\n".join(reviews)
+    # Инициализируем LLM
+    llm._ensure_initialized()
+    
+    formatted_reviews = "\n\n---\n\n".join(reviews[:20])
     
     prompt = GENERATE_RECOMMENDATIONS_PROMPT.format(
         topic=topic,
@@ -16,5 +18,4 @@ async def get_recommendations_for_reviews(topic: str, reviews: list[str]) -> str
     )
 
     response = await llm.ainvoke(prompt)
-    
     return response.content

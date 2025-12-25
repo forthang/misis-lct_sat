@@ -741,183 +741,78 @@ async def get_sentiment_alerts(
             })
             
     
-            
-        return sorted(alerts, key=lambda x: x["percentage_increase"] if isinstance(x["percentage_increase"], float) else float('inf'), reverse=True)
-            
-    
-            
-    
-            
-    async def get_negative_reviews_for_topic(
-            
-        session: AsyncSession,
-            
-        topic_name: str,
-            
-        start_date: datetime,
-            
-        end_date: datetime,
-            
-        limit: int = 20,
-            
-    ) -> List[str]:
-            
-        """
-            
-        Возвращает тексты негативных отзывов по заданной теме и периоду.
-            
-        """
-            
-        query = (
-            
-            select(Review.text)
-            
-            .join(ReviewTopic, Review.id == ReviewTopic.review_id)
-            
-            .join(Topic, ReviewTopic.topic_id == Topic.id)
-            
-            .where(
-            
-                Topic.name == topic_name,
-            
-                Review.date.between(start_date, end_date),
-            
-                ReviewTopic.sentiment == Sentiment.NEGATIVE
-            
-            )
-            
-            .order_by(Review.date.desc())
-            
-            .limit(limit)
-            
+    return sorted(alerts, key=lambda x: x["percentage_increase"] if isinstance(x["percentage_increase"], (int, float)) else float('inf'), reverse=True)
+
+
+async def get_negative_reviews_for_topic(
+    session: AsyncSession,
+    topic_name: str,
+    start_date: datetime,
+    end_date: datetime,
+    limit: int = 50,
+) -> List[str]:
+    """Возвращает тексты негативных отзывов по заданной теме и периоду."""
+    query = (
+        select(Review.text)
+        .join(ReviewTopic, Review.id == ReviewTopic.review_id)
+        .join(Topic, ReviewTopic.topic_id == Topic.id)
+        .where(
+            Topic.name == topic_name,
+            Review.date.between(start_date, end_date),
+            ReviewTopic.sentiment == Sentiment.NEGATIVE
         )
-            
-        
-            
-        
-            
-        
-            
-            result = await session.execute(query)
-            
-        
-            
-            return [row[0] for row in result.all()]
-            
-        
-            
-        
-            
-        
-            
-        
-            
-        
-            
-        async def get_all_reviews_for_export(session: AsyncSession) -> List[Dict[str, Any]]:
-            
-        
-            
-            """
-            
-        
-            
-            Возвращает все отзывы с темами и тональностями для экспорта.
-            
-        
-            
-            """
-            
-        
-            
-            query = (
-            
-        
-            
-                select(Review)
-            
-        
-            
-                .options(selectinload(Review.review_topics).selectinload(ReviewTopic.topic))
-            
-        
-            
-                .order_by(Review.date.desc())
-            
-        
-            
-            )
-            
-        
-            
-            
-            
-        
-            
-            result = await session.execute(query)
-            
-        
-            
-            reviews = result.scalars().all()
-            
-        
-            
-            
-            
-        
-            
-            export_data = []
-            
-        
-            
-            for review in reviews:
-            
-        
-            
-                for rt in review.review_topics:
-            
-        
-            
-                    export_data.append({
-            
-        
-            
-                        "review_id": review.id,
-            
-        
-            
-                        "date": review.date.isoformat(),
-            
-        
-            
-                        "rating": review.rating,
-            
-        
-            
-                        "text": review.text,
-            
-        
-            
-                        "topic": rt.topic.name,
-            
-        
-            
-                        "sentiment": rt.sentiment.value,
-            
-        
-            
-                    })
-            
-        
-            
-                    
-            
-        
-            
-            return export_data
-            
-        
-            
-        
-            
-    
+        .order_by(Review.date.desc())
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return [row[0] for row in result.all()]
+
+
+async def get_topics_negative_stats(
+    session: AsyncSession,
+    start_date: datetime,
+    end_date: datetime,
+) -> List[Dict[str, Any]]:
+    """Статистика негативных отзывов по темам для детекции алертов."""
+    query = (
+        select(
+            Topic.name,
+            func.count(ReviewTopic.review_id).label("negative_count"),
+        )
+        .select_from(ReviewTopic)
+        .join(Review, ReviewTopic.review_id == Review.id)
+        .join(Topic, ReviewTopic.topic_id == Topic.id)
+        .where(
+            Review.date.between(start_date, end_date),
+            ReviewTopic.sentiment == Sentiment.NEGATIVE
+        )
+        .group_by(Topic.name)
+        .order_by(func.count(ReviewTopic.review_id).desc())
+    )
+    result = await session.execute(query)
+    return [{"topic": name, "negative_count": count} for name, count in result.all()]
+
+
+async def get_all_reviews_for_export(session: AsyncSession) -> List[Dict[str, Any]]:
+    """Возвращает все отзывы с темами и тональностями для экспорта."""
+    query = (
+        select(Review)
+        .options(selectinload(Review.review_topics).selectinload(ReviewTopic.topic))
+        .order_by(Review.date.desc())
+    )
+    result = await session.execute(query)
+    reviews = result.scalars().all()
+
+    export_data = []
+    for review in reviews:
+        for rt in review.review_topics:
+            export_data.append({
+                "review_id": review.id,
+
+                "date": review.date.isoformat(),
+                "rating": review.rating,
+                "text": review.text,
+                "topic": rt.topic.name,
+                "sentiment": rt.sentiment.value,
+            })
+    return export_data

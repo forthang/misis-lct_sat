@@ -670,7 +670,7 @@ function App() {
     setIsLoadingAlerts(true);
     setAlertsError(null);
     try {
-      const response = await fetch('http://localhost:8000/api/alerts');
+      const response = await fetch('http://localhost:8000/api/dashboard/alerts');
       if (!response.ok) throw new Error(`Сервер вернул ошибку: ${response.status} ${response.statusText}`);
       const data = await response.json();
       if (data.status === 'success' && data.data) {
@@ -1864,49 +1864,45 @@ function App() {
 
   const renderHeatmapPage = () => {
     const processHeatmapData = () => {
-      if (!heatmapData) return { data: [], xLabels: [], yLabels: [] };
+      if (!heatmapData || heatmapData.length === 0) return { xLabels: [], yLabels: [], matrix: [] };
 
       const xLabels = [...new Set(heatmapData.map(d => d.period))].sort();
-      const yLabels = [...new Set(heatmapData.map(d => translateTopicName(d.topic)))].sort();
+      const yLabels = [...new Set(heatmapData.map(d => d.topic))].sort();
       
-      const data = heatmapData.map(d => ({
-        x: xLabels.indexOf(d.period),
-        y: yLabels.indexOf(translateTopicName(d.topic)),
-        z: d.count,
-        label: `${translateTopicName(d.topic)} - ${d.period}: ${d.count} негативных`,
-      }));
+      // Создаем матрицу для тепловой карты
+      const matrix = yLabels.map(topic => {
+        return xLabels.map(period => {
+          const item = heatmapData.find(d => d.topic === topic && d.period === period);
+          return item ? item.count : 0;
+        });
+      });
 
-      return { data, xLabels, yLabels };
+      return { xLabels, yLabels, matrix };
     };
 
-    const { data, xLabels, yLabels } = processHeatmapData();
-    const maxCount = Math.max(...heatmapData?.map(d => d.count) || [0]);
+    const { xLabels, yLabels, matrix } = processHeatmapData();
+    const maxCount = Math.max(...(heatmapData?.map(d => d.count) || [1]), 1);
 
     const getColor = (value) => {
-      if (value === 0) return '#eff6ff';
+      if (value === 0) return 'rgba(99, 102, 241, 0.05)';
       const percentage = maxCount > 0 ? value / maxCount : 0;
-      if (percentage < 0.2) return '#bddbff';
-      if (percentage < 0.4) return '#60a5fa';
-      if (percentage < 0.6) return '#2563eb';
-      if (percentage < 0.8) return '#1d4ed8';
-      return '#1e3a8a';
+      if (percentage < 0.2) return 'rgba(99, 102, 241, 0.2)';
+      if (percentage < 0.4) return 'rgba(99, 102, 241, 0.4)';
+      if (percentage < 0.6) return 'rgba(239, 68, 68, 0.5)';
+      if (percentage < 0.8) return 'rgba(239, 68, 68, 0.7)';
+      return 'rgba(239, 68, 68, 0.9)';
     };
 
-    const CustomTooltip = ({ active, payload }) => {
-      if (active && payload && payload.length) {
-        return (
-          <div className="tooltip">
-            <p className="tooltip__value">{payload[0].payload.label}</p>
-          </div>
-        );
-      }
-      return null;
+    const getTextColor = (value) => {
+      const percentage = maxCount > 0 ? value / maxCount : 0;
+      return percentage > 0.4 ? '#ffffff' : 'rgba(255, 255, 255, 0.7)';
     };
     
     return (
       <>
         <div className="main__header">
           <h1 className="main__title">Тепловая карта негатива</h1>
+          <p className="main__subtitle">Визуализация концентрации негативных отзывов по темам и периодам</p>
         </div>
 
         <div className="time-range-selector">
@@ -1931,53 +1927,106 @@ function App() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card__header-with-indicator">
-            <h4>Распределение негативных отзывов</h4>
-            <DataSourceIndicator source={dataSource.heatmap} />
-          </div>
-          {isLoadingHeatmap ? (
-            <div className="pie-chart__loading">
-              <div className="pie-chart__loading-spinner"></div>
-              <span className="pie-chart__loading-text">Загрузка данных для карты...</span>
+        <div className="card heatmap-card">
+          <div className="card__header">
+            <h4 className="card__title">Распределение негативных отзывов</h4>
+            <div className="heatmap-legend">
+              <span className="heatmap-legend__label">Меньше</span>
+              <div className="heatmap-legend__gradient"></div>
+              <span className="heatmap-legend__label">Больше</span>
             </div>
-          ) : null}
-          {heatmapError && console.log('[Heatmap] API error, using mock data:', heatmapError)}
-          {heatmapData && (
-            <ResponsiveContainer width="100%" height={Math.max(400, yLabels.length * 40)}>
-              <ScatterChart margin={{ top: 20, right: 30, bottom: 40, left: 150 }}>
-                <XAxis
-                  dataKey="x"
-                  type="number"
-                  name="Период"
-                  domain={[ -0.5, xLabels.length - 0.5]}
-                  tickCount={xLabels.length}
-                  tickFormatter={(tick) => xLabels[tick]}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                />
-                <YAxis
-                  dataKey="y"
-                  type="number"
-                  name="Категория"
-                  domain={[ -0.5, yLabels.length - 0.5]}
-                  tickCount={yLabels.length}
-                  tickFormatter={(tick) => yLabels[tick]}
-                  width={150}
-                  interval={0}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter name="Негативные отзывы" data={data} shape="square" fill="#8884d8">
-                  {data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={getColor(entry.z)} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
+          </div>
+          
+          {isLoadingHeatmap ? (
+            <div className="heatmap-loading">
+              <div className="heatmap-loading__spinner"></div>
+              <span className="heatmap-loading__text">Загрузка данных...</span>
+            </div>
+          ) : heatmapData && heatmapData.length > 0 ? (
+            <div className="heatmap-container">
+              <div className="heatmap-grid" style={{ 
+                gridTemplateColumns: `180px repeat(${xLabels.length}, 1fr)`,
+                gridTemplateRows: `40px repeat(${yLabels.length}, 50px)`
+              }}>
+                {/* Заголовок - пустая ячейка */}
+                <div className="heatmap-cell heatmap-cell--header heatmap-cell--corner"></div>
+                
+                {/* Заголовки периодов */}
+                {xLabels.map((period, i) => (
+                  <div key={`header-${i}`} className="heatmap-cell heatmap-cell--header">
+                    {period}
+                  </div>
+                ))}
+                
+                {/* Строки данных */}
+                {yLabels.map((topic, rowIndex) => (
+                  <React.Fragment key={`row-${rowIndex}`}>
+                    {/* Название темы */}
+                    <div className="heatmap-cell heatmap-cell--label">
+                      {translateTopicName(topic)}
+                    </div>
+                    
+                    {/* Ячейки данных */}
+                    {xLabels.map((period, colIndex) => {
+                      const value = matrix[rowIndex]?.[colIndex] || 0;
+                      return (
+                        <div 
+                          key={`cell-${rowIndex}-${colIndex}`}
+                          className="heatmap-cell heatmap-cell--data"
+                          style={{ 
+                            backgroundColor: getColor(value),
+                            color: getTextColor(value)
+                          }}
+                          title={`${translateTopicName(topic)} - ${period}: ${value} негативных отзывов`}
+                        >
+                          {value > 0 ? value : ''}
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="heatmap-empty">
+              <span className="heatmap-empty__icon">📊</span>
+              <span className="heatmap-empty__text">Нет данных за выбранный период</span>
+            </div>
           )}
         </div>
+
+        {/* Статистика по топ проблемным темам */}
+        {heatmapData && heatmapData.length > 0 && (
+          <div className="card heatmap-stats-card">
+            <h4 className="card__title">Топ проблемных тем</h4>
+            <div className="heatmap-stats">
+              {Object.entries(
+                heatmapData.reduce((acc, item) => {
+                  acc[item.topic] = (acc[item.topic] || 0) + item.count;
+                  return acc;
+                }, {})
+              )
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([topic, count], index) => (
+                  <div key={topic} className="heatmap-stat-item">
+                    <div className="heatmap-stat-item__rank">{index + 1}</div>
+                    <div className="heatmap-stat-item__info">
+                      <span className="heatmap-stat-item__topic">{translateTopicName(topic)}</span>
+                      <span className="heatmap-stat-item__count">{count} негативных отзывов</span>
+                    </div>
+                    <div 
+                      className="heatmap-stat-item__bar"
+                      style={{ 
+                        width: `${(count / maxCount) * 100}%`,
+                        backgroundColor: index === 0 ? '#ef4444' : index === 1 ? '#f97316' : '#6366f1'
+                      }}
+                    ></div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
       </>
     );
   };
@@ -2527,10 +2576,8 @@ function App() {
   const renderAlertsPage = () => (
     <>
       <div className="main__header">
-        <div className="main__header-with-indicator">
-          <h1 className="main__title">Оповещения о резких изменениях</h1>
-          <DataSourceIndicator source={dataSource.alerts} />
-        </div>
+        <h1 className="main__title">Оповещения и проблемы</h1>
+        <p className="main__subtitle">Выявленные проблемы с рекомендациями по решению</p>
       </div>
       <div className="alerts-page">
         {isLoadingAlerts ? (
@@ -2546,49 +2593,38 @@ function App() {
                 </div>
                 <div className="alert-skeleton__message skeleton"></div>
                 <div className="alert-skeleton__message alert-skeleton__message--short skeleton"></div>
-                <div className="alert-skeleton__footer">
-                  <div className="alert-skeleton__percentage skeleton"></div>
-                  <div className="alert-skeleton__timestamp skeleton"></div>
-                </div>
               </div>
             ))}
           </div>
-        ) : alertsError ? (
-          <div className="alerts-error">
-            <div className="alerts-error__icon">⚠️</div>
-            <h3 className="alerts-error__title">Не удалось загрузить оповещения</h3>
-            <p className="alerts-error__message">{alertsError}</p>
-            <div className="alerts-error__badge">
-              <span>📊</span>
-              <span>Отображены демо-данные</span>
-            </div>
-          </div>
         ) : alertsData && alertsData.length > 0 ? (
           alertsData.map((alert, index) => {
-            const severity = getAlertSeverity(alert.percentage_increase);
+            const severity = alert.severity || 'warning';
             return (
               <div key={index} className={`alert-card alert-card--${severity}`}>
                 <div className="alert-card__header">
                   <div className="alert-card__topic-wrapper">
                     <div className="alert-card__icon">
-                      {getSeverityIcon(severity)}
+                      {severity === 'critical' ? '🔴' : severity === 'warning' ? '🟠' : '🔵'}
                     </div>
                     <span className="alert-card__topic">{translateTopicName(alert.topic)}</span>
                   </div>
                   <span className="alert-card__badge">
-                    {getSeverityLabel(severity)}
+                    {alert.negative_count} негативных
                   </span>
                 </div>
-                <p className="alert-card__message">{alert.message}</p>
+                
+                <div className="alert-card__problem">
+                  <span className="alert-card__problem-label">⚠️ Проблема:</span>
+                  <p className="alert-card__problem-text">{alert.problem || alert.message}</p>
+                </div>
+                
+                <div className="alert-card__solution">
+                  <span className="alert-card__solution-label">💡 Решение:</span>
+                  <p className="alert-card__solution-text">{alert.solution}</p>
+                </div>
+                
                 <div className="alert-card__footer">
-                  <div className="alert-card__percentage-wrapper">
-                    <span className="alert-card__percentage-label">Рост негатива</span>
-                    <span className="alert-card__percentage">
-                      {alert.percentage_increase === 'inf' ? '∞' : `+${alert.percentage_increase}%`}
-                    </span>
-                    <span className="alert-card__percentage-arrow">↑</span>
-                  </div>
-                  <span className="alert-card__timestamp">Обнаружено сегодня</span>
+                  <span className="alert-card__recommendation">{alert.recommendation}</span>
                 </div>
               </div>
             );
@@ -2598,7 +2634,7 @@ function App() {
             <div className="alerts-empty__icon">✅</div>
             <h3 className="alerts-empty__title">Нет активных оповещений</h3>
             <p className="alerts-empty__description">
-              Все показатели в норме. Система автоматически уведомит вас при обнаружении резких изменений в тональности отзывов.
+              Все показатели в норме. Система автоматически уведомит вас при обнаружении проблем.
             </p>
           </div>
         )}
@@ -2609,7 +2645,7 @@ function App() {
   const handleExportCsv = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch('/api/export/reviews');
+      const response = await fetch('http://localhost:8000/api/export/reviews');
       if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
